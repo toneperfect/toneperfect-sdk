@@ -120,4 +120,4 @@ python examples/assess_file.py hello.wav 你好 zh-CN
 PYTHONPATH=src python -m unittest discover -s tests -v      # offline, transport is faked
 ```
 
-Documentation: https://api.toneperfect.app/docs · Source: https://github.com/vm542/toneperfect-sdk · License: MIT
+Documentation: https://api.toneperfect.app/docs · License: MIT

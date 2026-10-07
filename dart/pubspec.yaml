@@ -1,9 +1,7 @@
 name: toneperfect
 description: Client for the TonePerfect pronunciation assessment API. Sentence, word and sound scores for 10 languages, with Mandarin initial, final and tone per syllable.
-version: 0.1.0
+version: 0.1.1
 homepage: https://api.toneperfect.app
-repository: https://github.com/vm542/toneperfect-sdk/tree/main/dart
-issue_tracker: https://github.com/vm542/toneperfect-sdk/issues
 documentation: https://api.toneperfect.app/docs
 topics:
   - pronunciation

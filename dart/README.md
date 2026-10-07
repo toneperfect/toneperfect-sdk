@@ -74,4 +74,4 @@ concurrent requests per account. Grades are display scores calibrated per langua
 not accuracy percentages; every language pack is labelled `experimental` in
 `/v1/capabilities`. See the [methodology](https://api.toneperfect.app/methodology/).
 
-Docs: https://api.toneperfect.app/docs · Source: https://github.com/vm542/toneperfect-sdk · License: MIT
+Docs: https://api.toneperfect.app/docs · License: MIT

@@ -6,8 +6,8 @@
   "author": "TonePerfect <nik@toneperfect.app>",
   "homepage": "https://api.toneperfect.app",
   "bugs": {
-    "url": "https://github.com/vm542/toneperfect-sdk/issues",
-    "email": "nik@toneperfect.app"
+    "email": "nik@toneperfect.app",
+    "url": "https://api.toneperfect.app/docs"
   },
   "keywords": [
     "pronunciation",
@@ -48,10 +48,5 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {},
-  "devDependencies": {},
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vm542/toneperfect-sdk.git",
-    "directory": "node"
-  }
+  "devDependencies": {}
 }

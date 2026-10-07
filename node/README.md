@@ -121,4 +121,3 @@ npm test                                     # offline, fetch is faked
 
 Documentation: https://api.toneperfect.app/docs · License: MIT
 
-Source: https://github.com/vm542/toneperfect-sdk

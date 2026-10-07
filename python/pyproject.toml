@@ -26,8 +26,7 @@ dependencies = []
 Homepage = "https://api.toneperfect.app"
 Documentation = "https://api.toneperfect.app/docs"
 Methodology = "https://api.toneperfect.app/methodology/"
-Source = "https://github.com/vm542/toneperfect-sdk"
-Issues = "https://github.com/vm542/toneperfect-sdk/issues"
+SDKs = "https://api.toneperfect.app/sdk/"
 Pricing = "https://api.toneperfect.app/pricing/"
 
 [tool.setuptools]

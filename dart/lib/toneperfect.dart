@@ -20,7 +20,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 /// Package version, sent in the User-Agent header.
-const String toneperfectVersion = '0.1.0';
+const String toneperfectVersion = '0.1.1';
 
 /// Production API origin. Requests pass a proxy with a 26-second timeout.
 const String defaultBaseUrl = 'https://api.toneperfect.app';
