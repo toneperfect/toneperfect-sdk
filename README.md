@@ -11,6 +11,7 @@ Ten languages: `zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `
 | Node.js 18+ (ESM + CJS, no deps, types) | `npm install toneperfect` | [`node/`](node/) |
 | Dart / Flutter | `dart pub add toneperfect` | [`dart/`](dart/) |
 | Ruby 2.7+ (stdlib only) | `gem install toneperfect` | [`ruby/`](ruby/) |
+| PHP 8.0+ (ext-curl, no deps) | `composer require toneperfect/toneperfect` | [`php/`](php/) |
 | Go 1.21+ (stdlib only) | `go get <module path, see go/README>` | [`go/`](go/) |
 
 Each wraps exactly the two public endpoints — `GET /v1/capabilities` (no key) and
@@ -45,6 +46,7 @@ cd node && npm test
 cd dart && dart pub get && dart test
 cd ruby && ruby -Ilib -Itest test/test_client.rb && gem build toneperfect.gemspec
 cd go && go vet ./... && go test ./...
+cd php && php tests/run.php
 ```
 
 MIT licensed. Questions: nik@toneperfect.app

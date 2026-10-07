@@ -9,3 +9,5 @@ pubspec.lock
 .packages
 *.tgz
 *.gem
+vendor/
+composer.lock
