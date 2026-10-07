@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toneperfect"
+version = "0.1.0"
+description = "Client for the TonePerfect pronunciation assessment API: sentence, word and sound scores, Mandarin initial/final/tone per syllable."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [{ name = "TonePerfect", email = "nik@toneperfect.app" }]
+keywords = ["pronunciation", "speech", "assessment", "mandarin", "tones", "language-learning", "api", "pronunciation-assessment", "speech-assessment", "sdk"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+  "Topic :: Education",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://api.toneperfect.app"
+Documentation = "https://api.toneperfect.app/docs"
+Methodology = "https://api.toneperfect.app/methodology/"
+Source = "https://github.com/vm542/toneperfect-sdk"
+Issues = "https://github.com/vm542/toneperfect-sdk/issues"
+Pricing = "https://api.toneperfect.app/pricing/"
+
+[tool.setuptools]
+py-modules = ["toneperfect"]
+package-dir = {"" = "src"}

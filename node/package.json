@@ -1,0 +1,57 @@
+{
+  "name": "toneperfect",
+  "version": "0.1.0",
+  "description": "Client for the TonePerfect pronunciation assessment API: sentence, word and sound scores, Mandarin initial/final/tone per syllable.",
+  "license": "MIT",
+  "author": "TonePerfect <nik@toneperfect.app>",
+  "homepage": "https://api.toneperfect.app",
+  "bugs": {
+    "url": "https://github.com/vm542/toneperfect-sdk/issues",
+    "email": "nik@toneperfect.app"
+  },
+  "keywords": [
+    "pronunciation",
+    "speech",
+    "assessment",
+    "mandarin",
+    "tones",
+    "language-learning",
+    "api",
+    "pronunciation-assessment",
+    "speech-assessment",
+    "api-client",
+    "sdk"
+  ],
+  "main": "./index.cjs",
+  "module": "./index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs",
+      "require": "./index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.cjs",
+    "index.mjs",
+    "index.d.ts",
+    "README.md",
+    "LICENSE",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vm542/toneperfect-sdk.git",
+    "directory": "node"
+  }
+}
