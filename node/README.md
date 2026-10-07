@@ -1,10 +1,10 @@
 # toneperfect (Node.js)
 
-Client for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app):
-send a recording and its reference text, get 0–100 scores for the sentence, every
-word and every sound — including a separate initial, final and tone score for every
-Mandarin syllable — in one JSON response. Ten languages (`zh-CN`, `en-US`, `fr-FR`,
-`es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR`, `ja-JP`).
+Client for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app), 10 languages:
+`zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR` (beta) and `ja-JP` (beta).
+Send a short scripted recording and the text it should contain, get 0–100 scores for the sentence,
+every word and every sound in one JSON response, with expected vs heard sounds and timings.
+Mandarin syllables also get separate initial, final and tone scores.
 
 Plain JavaScript, ESM and CommonJS, no build step, no dependencies. Node 18+ (uses the
 global `fetch` / `FormData`). Types ship in `index.d.ts`.

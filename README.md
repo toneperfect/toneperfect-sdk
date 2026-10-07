@@ -1,9 +1,9 @@
 # TonePerfect SDKs
 
-Thin, open-source clients for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app):
-send a short recording and the text it should contain, get 0–100 scores for the sentence, every
-word and every sound, with a separate initial, final and tone score for every Mandarin syllable.
-Ten languages: `zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR`, `ja-JP`.
+Thin, open-source clients for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app),
+10 languages: `zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR` (beta), `ja-JP` (beta).
+Send a short scripted recording and the text it should contain, get 0–100 scores for the sentence,
+every word and every sound. Mandarin syllables also get separate initial, final and tone scores.
 
 | Language | Install | Source |
 | --- | --- | --- |

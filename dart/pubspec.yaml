@@ -1,5 +1,5 @@
 name: toneperfect
-description: Client for the TonePerfect pronunciation assessment API. Sentence, word and sound scores for 10 languages, with Mandarin initial, final and tone per syllable.
+description: Client for the TonePerfect pronunciation assessment API, 10 languages: sentence, word and sound scores for a recording of a known text.
 version: 0.1.1
 homepage: https://api.toneperfect.app
 documentation: https://api.toneperfect.app/docs

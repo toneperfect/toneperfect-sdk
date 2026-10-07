@@ -7,10 +7,9 @@ Gem::Specification.new do |spec|
   spec.version = TonePerfect::VERSION
   spec.authors = ["TonePerfect"]
   spec.email = ["nik@toneperfect.app"]
-  spec.summary = "Client for the TonePerfect pronunciation assessment API."
-  spec.description = "Score a short scripted recording against its reference text: sentence, word and sound " \
-                     "grades, with a separate initial, final and tone score for every Mandarin syllable. " \
-                     "Ten languages. Standard library only."
+  spec.summary = "Client for the TonePerfect pronunciation assessment API, 10 languages."
+  spec.description = "Pronunciation assessment API, 10 languages: score a short scripted recording against its " \
+                     "reference text and get sentence, word and sound grades. Standard library only."
   spec.homepage = "https://api.toneperfect.app"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 2.7"

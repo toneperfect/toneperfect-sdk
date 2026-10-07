@@ -1,7 +1,7 @@
 {
   "name": "toneperfect",
   "version": "0.1.0",
-  "description": "Client for the TonePerfect pronunciation assessment API: sentence, word and sound scores, Mandarin initial/final/tone per syllable.",
+  "description": "Client for the TonePerfect pronunciation assessment API, 10 languages: sentence, word and sound scores for a recording of a known text.",
   "license": "MIT",
   "author": "TonePerfect <nik@toneperfect.app>",
   "homepage": "https://api.toneperfect.app",
