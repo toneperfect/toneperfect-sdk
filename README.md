@@ -10,6 +10,8 @@ Ten languages: `zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `
 | Python 3.9+ (stdlib only) | `pip install toneperfect` | [`python/`](python/) |
 | Node.js 18+ (ESM + CJS, no deps, types) | `npm install toneperfect` | [`node/`](node/) |
 | Dart / Flutter | `dart pub add toneperfect` | [`dart/`](dart/) |
+| Ruby 2.7+ (stdlib only) | `gem install toneperfect` | [`ruby/`](ruby/) |
+| Go 1.21+ (stdlib only) | `go get <module path, see go/README>` | [`go/`](go/) |
 
 Each wraps exactly the two public endpoints — `GET /v1/capabilities` (no key) and
 `POST /v1/assess` (`Authorization: Bearer`, `Idempotency-Key`, multipart `audio` + `text` +
@@ -41,6 +43,8 @@ percentages and not comparable across vendors. Every language pack is currently 
 cd python && PYTHONPATH=src python -m unittest discover -s tests -v
 cd node && npm test
 cd dart && dart pub get && dart test
+cd ruby && ruby -Ilib -Itest test/test_client.rb && gem build toneperfect.gemspec
+cd go && go vet ./... && go test ./...
 ```
 
 MIT licensed. Questions: nik@toneperfect.app
