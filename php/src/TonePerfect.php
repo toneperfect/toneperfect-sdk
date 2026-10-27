@@ -28,6 +28,9 @@ const RETRY_SAME_KEY_CODES = ['rate_limit', 'account_busy', 'gateway_busy', 'dec
     'upload_timeout', 'request_pending', 'timeout', 'network_error'];
 /** Error codes that mean the key is spent: start a new attempt with a new key. */
 const NEW_KEY_CODES = ['idempotency_expired', 'idempotency_conflict'];
+/** Error codes a retry cannot fix soon. free_capacity (429): free credits reached today's shared limit;
+ *  it clears at the next UTC day, or immediately with a paid plan. */
+const NOT_RETRYABLE_CODES = ['free_capacity'];
 const IDEMPOTENCY_RE = '/^[A-Za-z0-9_.:-]{8,128}$/';
 
 /**
@@ -86,7 +89,7 @@ class TonePerfectException extends \RuntimeException
 
     public function retryable(): bool
     {
-        if ($this->finalized() || in_array($this->errorCode, NEW_KEY_CODES, true)) {
+        if ($this->finalized() || in_array($this->errorCode, NEW_KEY_CODES, true) || in_array($this->errorCode, NOT_RETRYABLE_CODES, true)) {
             return false;
         }
         return in_array($this->errorCode, RETRY_SAME_KEY_CODES, true) || in_array($this->status, [408, 429, 502, 503, 504], true);
@@ -108,7 +111,7 @@ class TonePerfectException extends \RuntimeException
 class AuthenticationError extends TonePerfectException {}
 /** 402 — nothing charged: subscription_required (50 free credits used, no plan), insufficient_credits, payment_balance_due. */
 class PaymentRequiredError extends TonePerfectException {}
-/** 429 — rate_limit (60/min) or account_busy (2 running). Retry with the SAME key. */
+/** 429 — rate_limit (60/min) or account_busy (2 running): retry with the SAME key. free_capacity: not retryable until the next UTC day. */
 class RateLimitError extends TonePerfectException {}
 /** Other 4xx — the request needs a fix. */
 class ValidationError extends TonePerfectException {}

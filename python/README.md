@@ -9,8 +9,12 @@ Mandarin syllables also get separate initial, final and tone scores.
 One file, standard library only (Python 3.9+), no dependencies.
 
 ```sh
-pip install toneperfect
+pip install "toneperfect @ git+https://github.com/vm542/toneperfect-sdk@main#subdirectory=python"
 ```
+
+Not on PyPI yet: install from this repository (pin a commit instead of `main` for
+reproducible builds), or copy `src/toneperfect.py` into your project. Do not
+`pip install toneperfect` from PyPI until it is announced here: that name is not ours yet.
 
 ## Quickstart
 
@@ -90,6 +94,7 @@ The client decides this from the response **body**, not the status:
 - `error.needs_new_key` — the failure was stored under the key (`error.finalized`: `error.id`
   and `error.billing` present) or the key expired; a new attempt needs a new key.
 - neither — fix the request (`invalid_api_key`, `insufficient_credits`, `invalid_audio`, …).
+  `free_capacity` (429, free credits reached today's shared limit) is not retryable: it clears at the next UTC day, or at once with a paid plan.
 
 `https://api.toneperfect.app` sits behind a proxy with a 26-second request timeout.
 Assessments normally finish well inside that; if yours do not, email

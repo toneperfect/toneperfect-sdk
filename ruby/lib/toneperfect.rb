@@ -33,6 +33,9 @@ module TonePerfect
                             upload_timeout request_pending timeout network_error].freeze
   # Error codes that mean the key is spent: start a new attempt with a new key.
   NEW_KEY_CODES = %w[idempotency_expired idempotency_conflict].freeze
+  # Error codes a retry cannot fix soon. free_capacity (429): free credits reached today's shared
+  # limit; it clears at the next UTC day, or immediately with a paid plan.
+  NOT_RETRYABLE_CODES = %w[free_capacity].freeze
   RETRY_STATUSES = [408, 429, 502, 503, 504].freeze
   IDEMPOTENCY_RE = /\A[A-Za-z0-9_.:-]{8,128}\z/.freeze
 
@@ -82,7 +85,7 @@ module TonePerfect
 
     # Retry later with the SAME Idempotency-Key: nothing was finalized.
     def retryable?
-      return false if finalized? || NEW_KEY_CODES.include?(@code)
+      return false if finalized? || NEW_KEY_CODES.include?(@code) || NOT_RETRYABLE_CODES.include?(@code)
 
       RETRY_SAME_KEY_CODES.include?(@code) || RETRY_STATUSES.include?(@status)
     end
@@ -93,7 +96,8 @@ module TonePerfect
   # 402 — nothing was charged. code: subscription_required (the 50 free credits are used up and there
   # is no active plan), insufficient_credits or payment_balance_due. Fix it in the dashboard.
   class PaymentRequiredError < Error; end
-  # 429 — rate_limit (60/min) or account_busy (2 running). Retry with the SAME key after retry_after.
+  # 429 — rate_limit (60/min) or account_busy (2 running): retry with the SAME key after retry_after.
+  # free_capacity (free credits hit today's shared limit) is not retryable: it clears at the next UTC day.
   class RateLimitError < Error; end
   # Other 4xx — the request needs a fix (invalid_audio, unsupported_language, upload_too_large, …).
   class ValidationError < Error; end

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/toneperfect/toneperfect-sdk/go"
+	"github.com/vm542/toneperfect-sdk/go"
 )
 
 func main() {

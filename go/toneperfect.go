@@ -60,6 +60,10 @@ var RetrySameKeyCodes = map[string]bool{
 // NewKeyCodes are error codes that mean the key is spent: start a new attempt with a new key.
 var NewKeyCodes = map[string]bool{"idempotency_expired": true, "idempotency_conflict": true}
 
+// NotRetryableCodes are error codes a retry cannot fix soon. free_capacity (429): free credits
+// reached today's shared limit; it clears at the next UTC day, or immediately with a paid plan.
+var NotRetryableCodes = map[string]bool{"free_capacity": true}
+
 var idempotencyRE = regexp.MustCompile(`^[A-Za-z0-9_.:-]{8,128}$`)
 
 // NewIdempotencyKey returns a fresh key for one recording attempt. Keep the same key while the
@@ -86,7 +90,7 @@ type ErrorKind string
 const (
 	KindAuthentication  ErrorKind = "AuthenticationError"  // 401 invalid_api_key
 	KindPaymentRequired ErrorKind = "PaymentRequiredError" // 402 subscription_required, insufficient_credits, payment_balance_due (nothing charged)
-	KindRateLimit       ErrorKind = "RateLimitError"       // 429 rate_limit (60/min) or account_busy (2 running)
+	KindRateLimit       ErrorKind = "RateLimitError"       // 429 rate_limit (60/min) or account_busy (2 running); free_capacity is not retryable until the next UTC day
 	KindValidation      ErrorKind = "ValidationError"      // other 4xx: fix the request
 	KindServer          ErrorKind = "ServerError"          // 5xx
 	KindAPIConnection   ErrorKind = "APIConnectionError"   // transport failure, Status 0: timeout or network_error
@@ -186,7 +190,7 @@ func (e *Error) NeedsNewKey() bool { return e.Finalized() || NewKeyCodes[e.Code]
 
 // Retryable: retry later with the SAME Idempotency-Key, nothing was finalized.
 func (e *Error) Retryable() bool {
-	if e.Finalized() || NewKeyCodes[e.Code] {
+	if e.Finalized() || NewKeyCodes[e.Code] || NotRetryableCodes[e.Code] {
 		return false
 	}
 	if RetrySameKeyCodes[e.Code] {

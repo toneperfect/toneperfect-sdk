@@ -89,6 +89,7 @@ The client decides this from the response **body**, not the status:
 - `error.needsNewKey` — the failure was stored under the key (`error.finalized`: `error.id`
   and `error.billing` present) or the key expired; a new attempt needs a new key.
 - neither — fix the request (`invalid_api_key`, `insufficient_credits`, `invalid_audio`, …).
+  `free_capacity` (429, free credits reached today's shared limit) is not retryable: it clears at the next UTC day, or at once with a paid plan.
 
 `https://api.toneperfect.app` sits behind a proxy with a 26-second request timeout.
 Assessments normally finish well inside that; if yours do not, email

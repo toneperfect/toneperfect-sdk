@@ -194,7 +194,7 @@ func TestSpentKeysAndClientErrors(t *testing.T) {
 			t.Errorf("%s", code)
 		}
 	}
-	for code, status := range map[string]int{"invalid_api_key": 401, "insufficient_credits": 402, "invalid_audio": 422, "unsupported_language": 422, "upload_too_large": 413} {
+	for code, status := range map[string]int{"invalid_api_key": 401, "insufficient_credits": 402, "invalid_audio": 422, "unsupported_language": 422, "upload_too_large": 413, "free_capacity": 429} {
 		e := errFrom(t, status, map[string]any{"error": map[string]any{"code": code, "message": "fix"}}, nil)
 		if e.Retryable() || e.NeedsNewKey() {
 			t.Errorf("%s", code)

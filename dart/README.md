@@ -65,7 +65,7 @@ Errors are typed: `AuthenticationError` (401), `PaymentRequiredError` (402:
 (429), `ValidationError` (other 4xx), `ServerError` (5xx) and `APIConnectionError`
 (timeout / network). All extend `TonePerfectError` with `status`, `code`, `message`,
 `requestId`, `retryable` (retry later with the **same** Idempotency-Key) and
-`needsNewKey`.
+`needsNewKey`. `free_capacity` (429, free credits reached today's shared limit) is not retryable: it clears at the next UTC day, or at once with a paid plan.
 
 ## Limits
 

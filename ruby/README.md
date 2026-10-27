@@ -8,9 +8,26 @@ Mandarin syllables also get separate initial, final and tone scores.
 
 One file, standard library only (`net/http`, `json`), Ruby 2.7+.
 
-```sh
-gem install toneperfect
+Not on RubyGems yet: install from this repository with Bundler (pin a commit with `ref:`
+for reproducible builds):
+
+```ruby
+# Gemfile
+gem "toneperfect", git: "https://github.com/vm542/toneperfect-sdk", branch: "main", glob: "ruby/*.gemspec"
 ```
+
+```sh
+bundle install
+```
+
+Or build the gem yourself:
+
+```sh
+git clone https://github.com/vm542/toneperfect-sdk && cd toneperfect-sdk/ruby
+gem build toneperfect.gemspec && gem install ./toneperfect-0.1.0.gem
+```
+
+Do not `gem install toneperfect` from RubyGems until it is announced here: that name is not ours yet.
 
 ## Quickstart
 
@@ -53,14 +70,14 @@ Every non-2xx response raises a `TonePerfect::Error` subclass with `status`, `co
 | --- | --- |
 | `AuthenticationError` | 401 `invalid_api_key` |
 | `PaymentRequiredError` | 402 `subscription_required`, `insufficient_credits`, `payment_balance_due` (nothing charged) |
-| `RateLimitError` | 429 `rate_limit` (60/min) or `account_busy` (2 running) |
+| `RateLimitError` | 429 `rate_limit` (60/min) or `account_busy` (2 running); `free_capacity` (not retryable until the next UTC day) |
 | `ValidationError` | other 4xx (`invalid_audio`, `unsupported_language`, …) |
 | `ServerError` | 5xx |
 | `APIConnectionError` | transport failure, `status` 0, `timeout` / `network_error` |
 
 Decide the next step from the error, not the status: `retryable?` → retry later with the
 **same** `idempotency_key`; `needs_new_key?` (incl. `finalized?`) → start a new attempt with a
-new key; otherwise fix the request.
+new key; otherwise fix the request. `free_capacity` (429, free credits reached today's shared limit) is not retryable: it clears at the next UTC day, or at once with a paid plan.
 
 ## Scope
 

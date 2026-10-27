@@ -7,12 +7,17 @@ every word and every sound. Mandarin syllables also get separate initial, final 
 
 | Language | Install | Source |
 | --- | --- | --- |
-| Python 3.9+ (stdlib only) | `pip install toneperfect` | [`python/`](python/) |
+| Python 3.9+ (stdlib only) | `pip install "toneperfect @ git+https://github.com/vm542/toneperfect-sdk@main#subdirectory=python"` | [`python/`](python/) |
 | Node.js 18+ (ESM + CJS, no deps, types) | `npm install toneperfect` | [`node/`](node/) |
 | Dart / Flutter | `dart pub add toneperfect` | [`dart/`](dart/) |
-| Ruby 2.7+ (stdlib only) | `gem install toneperfect` | [`ruby/`](ruby/) |
-| PHP 8.0+ (ext-curl, no deps) | `composer require toneperfect/toneperfect` | [`php/`](php/) |
-| Go 1.21+ (stdlib only) | `go get <module path, see go/README>` | [`go/`](go/) |
+| Ruby 2.7+ (stdlib only) | Bundler from Git, see [`ruby/README.md`](ruby/README.md) | [`ruby/`](ruby/) |
+| PHP 8.0+ (ext-curl, no deps) | Composer `path` repository, see [`php/README.md`](php/README.md) | [`php/`](php/) |
+| Go 1.21+ (stdlib only) | `go get github.com/vm542/toneperfect-sdk/go@main` | [`go/`](go/) |
+
+Only the npm (`toneperfect`) and pub.dev (`toneperfect`) packages are published by us. The
+Python, Ruby and PHP clients are **not** on PyPI, RubyGems or Packagist yet: install them from
+this repository as shown, and do not install a package of that name from those registries
+until it is announced here.
 
 Each wraps exactly the two public endpoints — `GET /v1/capabilities` (no key) and
 `POST /v1/assess` (`Authorization: Bearer`, `Idempotency-Key`, multipart `audio` + `text` +

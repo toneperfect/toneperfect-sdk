@@ -49,6 +49,9 @@ RETRY_SAME_KEY_CODES = frozenset({
 })
 #: Error codes that mean the key is spent: start a new attempt with a new key.
 NEW_KEY_CODES = frozenset({"idempotency_expired", "idempotency_conflict"})
+#: Error codes that a retry cannot fix soon. ``free_capacity`` (429): the shared daily limit for
+#: free credits is reached; it clears at the next UTC day, or immediately with a paid plan.
+NOT_RETRYABLE_CODES = frozenset({"free_capacity"})
 _IDEMPOTENCY_RE = re.compile(r"^[A-Za-z0-9_.:-]{8,128}$")
 
 AudioInput = Union[str, "os.PathLike[str]", bytes, bytearray, IO[bytes]]
@@ -119,7 +122,7 @@ class TonePerfectError(Exception):
     @property
     def retryable(self) -> bool:
         """Retry later with the SAME Idempotency-Key: nothing was finalized."""
-        if self.finalized or self.code in NEW_KEY_CODES:
+        if self.finalized or self.code in NEW_KEY_CODES or self.code in NOT_RETRYABLE_CODES:
             return False
         return self.code in RETRY_SAME_KEY_CODES or self.status in (408, 429, 502, 503, 504)
 
@@ -137,7 +140,8 @@ class PaymentRequiredError(TonePerfectError):
 
 
 class RateLimitError(TonePerfectError):
-    """429 — ``rate_limit`` (60 assessments/minute) or ``account_busy`` (2 running). Retry with the SAME key; see ``retry_after``."""
+    """429 — ``rate_limit`` (60 assessments/minute) or ``account_busy`` (2 running): retry with the SAME key; see ``retry_after``.
+    ``free_capacity`` (free credits hit today's shared limit) is not retryable: it clears at the next UTC day, or start a plan."""
 
 
 class ValidationError(TonePerfectError):

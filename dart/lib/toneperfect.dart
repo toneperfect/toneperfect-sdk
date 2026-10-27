@@ -38,6 +38,10 @@ const Set<String> retrySameKeyCodes = {
 /// Error codes that mean the key is spent: start a new attempt with a new key.
 const Set<String> newKeyCodes = {'idempotency_expired', 'idempotency_conflict'};
 
+/// Error codes a retry cannot fix soon. `free_capacity` (429): free credits reached today's
+/// shared limit; it clears at the next UTC day, or immediately with a paid plan.
+const Set<String> notRetryableCodes = {'free_capacity'};
+
 final RegExp _idempotencyRe = RegExp(r'^[A-Za-z0-9_.:-]{8,128}$');
 
 /// A fresh Idempotency-Key for one recording attempt.
@@ -93,7 +97,7 @@ class TonePerfectError implements Exception {
 
   /// Retry later with the SAME Idempotency-Key: nothing was finalized.
   bool get retryable {
-    if (finalized || newKeyCodes.contains(code)) return false;
+    if (finalized || newKeyCodes.contains(code) || notRetryableCodes.contains(code)) return false;
     return retrySameKeyCodes.contains(code) || const [408, 429, 502, 503, 504].contains(status);
   }
 
@@ -113,7 +117,8 @@ class PaymentRequiredError extends TonePerfectError {
   PaymentRequiredError(super.status, super.code, super.message, {super.requestId, super.retryAfter, super.body});
 }
 
-/// 429: `rate_limit` (60 assessments/minute) or `account_busy` (2 running). Retry with the same key.
+/// 429: `rate_limit` (60 assessments/minute) or `account_busy` (2 running): retry with the same key.
+/// `free_capacity` (free credits hit today's shared limit) is not retryable: it clears at the next UTC day.
 class RateLimitError extends TonePerfectError {
   RateLimitError(super.status, super.code, super.message, {super.requestId, super.retryAfter, super.body});
 }

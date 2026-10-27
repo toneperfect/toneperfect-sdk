@@ -90,7 +90,7 @@ export declare class TonePerfectError extends Error {
 export declare class AuthenticationError extends TonePerfectError {}
 /** 402: nothing charged. code: subscription_required | insufficient_credits | payment_balance_due. */
 export declare class PaymentRequiredError extends TonePerfectError {}
-/** 429: rate_limit or account_busy. Retry with the same Idempotency-Key. */
+/** 429: rate_limit or account_busy: retry with the same Idempotency-Key. free_capacity: not retryable until the next UTC day. */
 export declare class RateLimitError extends TonePerfectError {}
 /** Other 4xx: fix the request. */
 export declare class ValidationError extends TonePerfectError {}

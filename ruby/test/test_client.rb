@@ -136,7 +136,7 @@ class ClientTest < Minitest::Test
       assert e.needs_new_key?, code
       refute e.retryable?, code
     end
-    [[401, "invalid_api_key"], [402, "insufficient_credits"], [422, "invalid_audio"], [422, "unsupported_language"], [413, "upload_too_large"]].each do |status, code|
+    [[401, "invalid_api_key"], [402, "insufficient_credits"], [422, "invalid_audio"], [422, "unsupported_language"], [413, "upload_too_large"], [429, "free_capacity"]].each do |status, code|
       e = error_from(status, { "error" => { "code" => code, "message" => "fix" } })
       refute e.retryable?, code
       refute e.needs_new_key?, code

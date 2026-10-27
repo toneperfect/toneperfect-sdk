@@ -114,7 +114,7 @@ class ClientTests(unittest.TestCase):
             error = self._error(status, {"error": {"code": code, "message": "new key"}})
             self.assertTrue(error.needs_new_key, code)
             self.assertFalse(error.retryable, code)
-        for status, code in ((401, "invalid_api_key"), (402, "insufficient_credits"), (422, "invalid_audio"), (422, "unsupported_language"), (413, "upload_too_large")):
+        for status, code in ((401, "invalid_api_key"), (402, "insufficient_credits"), (422, "invalid_audio"), (422, "unsupported_language"), (413, "upload_too_large"), (429, "free_capacity")):
             error = self._error(status, {"error": {"code": code, "message": "fix"}})
             self.assertFalse(error.retryable, code)
             self.assertFalse(error.needs_new_key, code)

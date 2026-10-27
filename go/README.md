@@ -9,13 +9,13 @@ Mandarin syllables also get separate initial, final and tone scores.
 One file, standard library only, Go 1.21+.
 
 ```sh
-go get github.com/toneperfect/toneperfect-sdk/go
+go get github.com/vm542/toneperfect-sdk/go@main
 ```
 
-> **Module path is a placeholder.** `github.com/toneperfect/toneperfect-sdk/go` must be
-> replaced in `go.mod`, this README and `examples/` with the real public repository path
-> (or a vanity path such as `api.toneperfect.app/go`, served with a `go-import` meta tag)
-> before tagging `go/v0.1.0`. pkg.go.dev indexes the module once that path resolves.
+The module lives in the `go/` directory of [`vm542/toneperfect-sdk`](https://github.com/vm542/toneperfect-sdk).
+No release tag exists yet, so `@main` resolves to a pseudo-version of the current commit; pin
+that version in your `go.mod`. Once a `go/v0.1.0` tag is published you can use `@v0.1.0`.
+Import it as `toneperfect "github.com/vm542/toneperfect-sdk/go"`.
 
 ## Quickstart
 
@@ -63,13 +63,13 @@ Every non-2xx response and every transport failure returns `*toneperfect.Error`
 | --- | --- |
 | `ErrAuthentication` | 401 `invalid_api_key` |
 | `ErrPaymentRequired` | 402 `subscription_required`, `insufficient_credits`, `payment_balance_due` (nothing charged) |
-| `ErrRateLimit` | 429 `rate_limit` (60/min) or `account_busy` (2 running) |
+| `ErrRateLimit` | 429 `rate_limit` (60/min) or `account_busy` (2 running); `free_capacity` (not retryable until the next UTC day) |
 | `ErrValidation` | other 4xx |
 | `ErrServer` | 5xx |
 | `ErrAPIConnection` | `Status` 0, `timeout` / `network_error` |
 
 `Retryable()` → retry later with the **same** `IdempotencyKey`; `NeedsNewKey()` (incl.
-`Finalized()`) → new attempt, new key; otherwise fix the request.
+`Finalized()`) → new attempt, new key; otherwise fix the request. `free_capacity` (429, free credits reached today's shared limit) is not retryable: it clears at the next UTC day, or at once with a paid plan.
 
 ## Scope
 

@@ -82,7 +82,7 @@ test('spent keys and client errors', async () => {
     const e = await errorFrom(409, { error: { code, message: 'new key' } });
     assert.equal(e.needsNewKey, true, code); assert.equal(e.retryable, false, code);
   }
-  for (const [status, code] of [[401, 'invalid_api_key'], [402, 'insufficient_credits'], [422, 'invalid_audio'], [422, 'unsupported_language'], [413, 'upload_too_large']]) {
+  for (const [status, code] of [[401, 'invalid_api_key'], [402, 'insufficient_credits'], [422, 'invalid_audio'], [422, 'unsupported_language'], [413, 'upload_too_large'], [429, 'free_capacity']]) {
     const e = await errorFrom(status, { error: { code, message: 'fix' } });
     assert.equal(e.retryable, false, code); assert.equal(e.needsNewKey, false, code);
   }

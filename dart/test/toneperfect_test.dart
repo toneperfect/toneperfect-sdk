@@ -80,6 +80,20 @@ void main() {
     }
   });
 
+  test('free_capacity 429 is not retryable (it clears at the next UTC day)', () async {
+    final client = TonePerfect(
+        apiKey: 'k',
+        httpClient: MockClient((_) async => http.Response(jsonEncode({'error': {'code': 'free_capacity', 'message': 'm'}}), 429)));
+    try {
+      await client.assess([1, 2, 3], text: 'hi', language: 'en-US');
+      fail('expected an error');
+    } on RateLimitError catch (e) {
+      expect(e.code, 'free_capacity');
+      expect(e.retryable, isFalse);
+      expect(e.needsNewKey, isFalse);
+    }
+  });
+
   test('HTML 502 from a proxy is retryable with the same key', () async {
     final client = TonePerfect(httpClient: MockClient((_) async => http.Response('<html>bad gateway</html>', 502)));
     try {

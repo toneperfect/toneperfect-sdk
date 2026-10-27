@@ -22,6 +22,9 @@ const DECISIONS = Object.freeze(['review', 'uncertain', 'no_correction', 'unasse
 const RETRY_SAME_KEY_CODES = new Set(['rate_limit', 'account_busy', 'gateway_busy', 'decoder_busy', 'audio_decoder_unavailable', 'upload_timeout', 'request_pending', 'timeout', 'network_error']);
 /** Error codes that mean the key is spent: start a new attempt with a new key. */
 const NEW_KEY_CODES = new Set(['idempotency_expired', 'idempotency_conflict']);
+/** Error codes a retry cannot fix soon. free_capacity (429): free credits reached today's shared
+ *  limit; it clears at the next UTC day, or immediately with a paid plan. */
+const NOT_RETRYABLE_CODES = new Set(['free_capacity']);
 const IDEMPOTENCY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
 
 /**
@@ -66,7 +69,7 @@ class TonePerfectError extends Error {
   get needsNewKey() { return this.finalized || NEW_KEY_CODES.has(this.code); }
   /** Retry later with the SAME Idempotency-Key: nothing was finalized. */
   get retryable() {
-    if (this.finalized || NEW_KEY_CODES.has(this.code)) return false;
+    if (this.finalized || NEW_KEY_CODES.has(this.code) || NOT_RETRYABLE_CODES.has(this.code)) return false;
     return RETRY_SAME_KEY_CODES.has(this.code) || [408, 429, 502, 503, 504].includes(this.status);
   }
 }
@@ -76,7 +79,8 @@ class AuthenticationError extends TonePerfectError {}
 /** 402: nothing was charged. code = subscription_required (50 free credits used, no active plan),
  *  insufficient_credits or payment_balance_due. Fix it in https://api.toneperfect.app/dashboard */
 class PaymentRequiredError extends TonePerfectError {}
-/** 429: rate_limit (60/min) or account_busy (2 running). Retry with the SAME key after retryAfter. */
+/** 429: rate_limit (60/min) or account_busy (2 running): retry with the SAME key after retryAfter.
+ *  free_capacity (free credits hit today's shared limit) is not retryable: it clears at the next UTC day. */
 class RateLimitError extends TonePerfectError {}
 /** Other 4xx: the request needs a fix (invalid_audio, unsupported_language, upload_too_large, ...). */
 class ValidationError extends TonePerfectError {}

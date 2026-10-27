@@ -84,7 +84,7 @@ test('not-finalized failures retry with the same key', function () {
 
 test('spent keys and client errors', function () {
     foreach (['idempotency_expired', 'idempotency_conflict'] as $code) { $e = err(409, ['error' => ['code' => $code, 'message' => 'n']]); check($e->needsNewKey() && !$e->retryable(), $code); }
-    foreach ([[401, 'invalid_api_key'], [402, 'insufficient_credits'], [422, 'invalid_audio'], [422, 'unsupported_language'], [413, 'upload_too_large']] as [$s, $code]) {
+    foreach ([[401, 'invalid_api_key'], [402, 'insufficient_credits'], [422, 'invalid_audio'], [422, 'unsupported_language'], [413, 'upload_too_large'], [429, 'free_capacity']] as [$s, $code]) {
         $e = err($s, ['error' => ['code' => $code, 'message' => 'fix']]); check(!$e->retryable() && !$e->needsNewKey(), $code);
     }
 });
