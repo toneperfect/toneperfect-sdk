@@ -1,44 +1,32 @@
 // Assess one recording and print what the API returned.
-//
-//   export TONEPERFECT_API_KEY=tp_live_...
-//   dart run example/main.dart hello.wav 你好 zh-CN
-//
-// Without arguments it only lists the languages (no key needed).
+//   export TONEPERFECT_API_KEY=tp_test_...      (or tp_live_... for real scores)
+//   dart run example/main.dart hello.ogg 你好 zh-CN
 import 'dart:io';
 
 import 'package:toneperfect/toneperfect.dart';
 
 Future<void> main(List<String> args) async {
-  final client = TonePerfect(apiKey: Platform.environment['TONEPERFECT_API_KEY'] ?? '');
+  if (args.length < 3) {
+    stderr.writeln('usage: main.dart <audio> <text> <locale>');
+    exit(2);
+  }
+  final client = TonePerfect(); // reads TONEPERFECT_API_KEY
   try {
-    if (args.length < 2) {
-      final caps = await client.capabilities();
-      for (final lang in caps['languages'] as List) {
-        print('${lang['locale']}  ${lang['status']}');
-      }
-      return;
-    }
-    final language = args.length > 2 ? args[2] : 'zh-CN';
-    final result = await client.assess(File(args[0]).readAsBytesSync(),
-        text: args[1], language: language, filename: args[0].split('/').last);
-    print('model: ${result.modelVersion} | request: ${result.id} | billing: ${result.billing}');
+    final result = await client.assess(await File(args[0]).readAsBytes(), filename: args[0], text: args[1], language: args[2]);
+    print('model: ${result.modelVersion} | request: ${result.id} | engine: ${result.engine} | test: ${result.test}');
+    print('billing: ${result.billing.credits} credit(s), source ${result.billing.source}');
     if (!result.assessable) {
       print('not assessable: ${result.reason}');
       return;
     }
-    print('scores: ${result.scores}');
     for (final word in result.words) {
-      print('  ${word['word']}  ${word['score']}');
-      for (final phone in (word['phones'] as List? ?? const [])) {
-        if (phone['decision'] == 'review') {
-          print('      expected ${phone['expected']} heard ${phone['heard']} (${phone['score']})');
-        }
-      }
+      final flagged = word.phones.where((p) => p.decision == 'review').map((p) => '${p.dimension} ${p.expected}->${p.heard}');
+      print('${word.word}\t${word.score}\t${word.decision ?? ''}\t${flagged.join(', ')}');
     }
   } on PaymentRequiredError catch (e) {
-    print('No credits left (${e.code}): ${e.message} -> https://api.toneperfect.app/dashboard');
+    stderr.writeln('${e.code}: ${e.message} Fix it at ${e.billingUrl}');
   } on TonePerfectError catch (e) {
-    print('${e.status} ${e.code}: ${e.message}');
+    stderr.writeln('${e.status} ${e.code}: ${e.message} (request ${e.requestId})');
   } finally {
     client.close();
   }

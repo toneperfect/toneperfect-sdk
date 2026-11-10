@@ -1,78 +1,104 @@
-# toneperfect (Ruby)
+# TonePerfect Ruby client
 
-Client for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app), 10 languages:
-`zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR` (beta) and `ja-JP` (beta).
-Send a short scripted recording and the text it should contain, get 0–100 scores for the sentence,
-every word and every sound in one JSON response, with expected vs heard sounds and timings.
-Mandarin syllables also get separate initial, final and tone scores.
-
-One file, standard library only (`net/http`, `json`), Ruby 2.7+.
+Client for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app): send a short recording
+and the text it should contain, get 0–100 scores for the sentence, every word and every sound, with Mandarin
+initial, final and tone per syllable. 10 languages. Standard library only, Ruby 3.0+.
 
 ```sh
 gem install toneperfect
 ```
 
-## Quickstart
+## Try it with a test key
+
+[Sign up](https://api.toneperfect.app/signup) (50 free credits, no card), then in the dashboard open
+**API keys** and create a **test key** (`tp_test_…`). A test key runs the real request path but returns a
+fixed example result: it never scores your audio and never spends credits. Swap in a live key
+(`tp_live_…`) for real scores. Keep keys on a server.
+
+```sh
+export TONEPERFECT_API_KEY="tp_test_..."
+curl -o hello.ogg https://api.toneperfect.app/capsule/speech-zh-nihao.ogg   # 2 s of 你好
+```
 
 ```ruby
 require "toneperfect"
 
-client = TonePerfect::Client.new(api_key: "tp_live_...")   # or set TONEPERFECT_API_KEY
-result = client.assess("hello.wav", text: "你好", language: "zh-CN")
-puts result.assessable?, result.overall, result.billing
+client = TonePerfect::Client.new # reads TONEPERFECT_API_KEY
+result = client.assess("hello.ogg", text: "你好", language: "zh-CN")
+
+puts [result.assessable?, result.overall, result.billing.credits, result.test?].inspect
 result.words.each do |word|
-  puts word["word"], word["score"], word["phones"].select { |p| p["decision"] == "review" }
+  word.phones.each { |p| puts [word.word, p.dimension, p.expected, p.heard, p.score, p.decision].join(" ") }
 end
 ```
 
-Get a key: [create an account](https://api.toneperfect.app/signup) → dashboard → API keys.
-New accounts get 50 free credits, no card needed; then the Starter plan is $10/month
-([pricing](https://api.toneperfect.app/pricing/)). Keep the key on your server.
+`language:` is required: `zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR` or
+`ja-JP`. `audio` is a path, a binary String or an IO opened in binary mode.
 
-## What is wrapped
+## Results
 
-| Method | Endpoint | Notes |
-| --- | --- | --- |
-| `client.capabilities` | `GET /v1/capabilities` | No key needed. Languages, `status`, dimensions, `limits`, `model_version`. |
-| `client.assess(audio, text:, language:, pinyin:, task:, idempotency_key:)` | `POST /v1/assess` | Multipart `audio`, `text`, `language`, optional `pinyin` (`ni3 hao3`) and `task` (`general`, `connected_speech`, `isolated_word`). Headers `Authorization: Bearer` + `Idempotency-Key`. |
+`assess` returns a `TonePerfect::Assessment`: `assessable?` and `reason` (a recording that could not be scored
+is free and is not a score of zero), `overall` and `scores` (0–100; `nil` = not measured by this pack), `words`
+(`Word`: `word`, `score`, `start_ms`, `end_ms`, `decision`, `pinyin`, `phones`), `phones` (`Phone`:
+`dimension`, `expected`, `heard`, `score`, `decision`), `billing` (`credits`, `balance_credits`,
+`free_credits`, `source`: `free`, `plan` or `test`), `warnings`, `engine`, `model_version`, `id`, `replayed?`,
+`test?`, and `data`, the JSON as returned (`word["field"]` reads any raw field). Act on `decision`, not on every
+low grade. `compact: true` asks for the `toneperfect.compact.v1` schema; the same methods work on it.
 
-`audio` is a file path, an IO opened in binary mode, or a **binary** String
-(`File.binread(...)` or `"...".b`); any other String is treated as a path.
+## Errors, retries and timeouts
 
-`assess` returns a `TonePerfect::Assessment`: `data` (full JSON body), `assessable?` /
-`reason` (never show an unassessable result as zero), `scores` (`nil` = dimension not
-supported by the pack), `overall`, `words`, `billing` (`{"credits", "balance_credits"}`;
-failed or unassessable requests charge 0), `model_version`, `id`, `replayed?`.
+Every error is a `TonePerfect::Error` with the API's `code`, `detail` (its message), `status` and `request_id`.
+Subclasses: `AuthenticationError` (401), `PaymentRequiredError` (402, with `billing_url` and, when the API sends
+them, `pricing_url` and `plan`), `RateLimitError` (429), `ValidationError` (other 4xx), `ServerError` (5xx) and
+`APIConnectionError` (timeout or network failure). The client retries a failure that stored nothing
+(`retryable?`) up to `max_retries` times with the **same** Idempotency-Key, so a finished result is returned and
+charged once; `needs_new_key?` marks a failure stored under the key. A test key rehearses each outcome:
 
-## Errors and retries
+```ruby
+require "toneperfect"
 
-Every non-2xx response raises a `TonePerfect::Error` subclass with `status`, `code`,
-`detail`, `request_id`, `retry_after`, `body`:
+client = TonePerfect::Client.new(timeout: 30, max_retries: 2)
+begin
+  client.assess("hello.ogg", text: "你好", language: "zh-CN", test_outcome: "subscription_required")
+rescue TonePerfect::PaymentRequiredError => e
+  puts "#{e.code} -> #{e.billing_url}"
+rescue TonePerfect::Error => e
+  puts [e.status, e.code, e.detail, e.retryable?, e.needs_new_key?].inspect
+end
 
-| Class | When |
-| --- | --- |
-| `AuthenticationError` | 401 `invalid_api_key` |
-| `PaymentRequiredError` | 402 `subscription_required`, `insufficient_credits`, `payment_balance_due` (nothing charged) |
-| `RateLimitError` | 429 `rate_limit` (60/min) or `account_busy` (2 running) |
-| `ValidationError` | other 4xx (`invalid_audio`, `unsupported_language`, …) |
-| `ServerError` | 5xx |
-| `APIConnectionError` | transport failure, `status` 0, `timeout` / `network_error` |
-
-Decide the next step from the error, not the status: `retryable?` → retry later with the
-**same** `idempotency_key`; `needs_new_key?` (incl. `finalized?`) → start a new attempt with a
-new key; otherwise fix the request.
-
-## Scope
-
-Scripted speech only: the learner reads a known text. Grades are display scores calibrated
-per language against native references — not accuracy percentages and not comparable
-across vendors. Every language pack is labelled `experimental` in `/v1/capabilities`.
-
-## Development
-
-```sh
-ruby -Ilib -Itest test/test_client.rb   # or: rake test
-gem build toneperfect.gemspec
+unscored = client.assess("hello.ogg", text: "你好", language: "zh-CN", test_outcome: "unassessable")
+puts [unscored.assessable?, unscored.reason].inspect
 ```
 
-MIT licensed. Docs: https://api.toneperfect.app/docs · Questions: nik@toneperfect.app
+To resend the same recording safely after a crash, keep your own key:
+
+```ruby
+require "toneperfect"
+
+client = TonePerfect::Client.new
+key = TonePerfect.new_idempotency_key # store it with the recording
+first = client.assess("hello.ogg", text: "I like sunny days", language: "en-US", idempotency_key: key)
+again = client.assess("hello.ogg", text: "I like sunny days", language: "en-US", idempotency_key: key)
+puts [first.id == again.id, again.replayed?].inspect # the stored result, not charged twice
+```
+
+## Other endpoints
+
+```ruby
+require "toneperfect"
+
+client = TonePerfect::Client.new
+puts client.lint("我有3个苹果", language: "zh-CN")["issues"].inspect # free reference-text check, no key
+puts client.status["status"]                                         # synthetic engine probe
+```
+
+## Configuration
+
+`TonePerfect::Client.new(api_key: nil, base_url: nil, timeout: 60, max_retries: 2, headers: {})`. `api_key`
+defaults to `ENV["TONEPERFECT_API_KEY"]`, `base_url` to `ENV["TONEPERFECT_BASE_URL"]`, else
+`https://api.toneperfect.app` (a proxy with a 26-second limit: a longer passage comes back on the automatic
+retry, charged once). `headers:` adds headers to every request, for example `TonePerfect-Fallback: off`.
+
+Grades are display scores calibrated per language against native references, not accuracy percentages and not
+comparable across vendors. Every language pack is labelled `experimental` in `/v1/capabilities`.
+Docs: https://api.toneperfect.app/docs · MIT licence · nik@toneperfect.app

@@ -1,8 +1,10 @@
 name: toneperfect
 description: "Client for the TonePerfect pronunciation assessment API, 10 languages: sentence, word and sound scores for a recording of a known text."
-version: 0.1.1
+version: 0.3.0
 homepage: https://api.toneperfect.app
 documentation: https://api.toneperfect.app/docs
+repository: https://github.com/vm542/toneperfect-sdk/tree/main/dart
+issue_tracker: https://github.com/vm542/toneperfect-sdk/issues
 topics:
   - pronunciation
   - speech
@@ -15,6 +17,7 @@ environment:
 
 dependencies:
   http: ^1.2.0
+  http_parser: ^4.0.0
 
 dev_dependencies:
   lints: ^5.0.0

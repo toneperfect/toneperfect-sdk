@@ -12,10 +12,12 @@ Gem::Specification.new do |spec|
                      "reference text and get sentence, word and sound grades. Standard library only."
   spec.homepage = "https://api.toneperfect.app"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 2.7"
+  spec.required_ruby_version = ">= 3.0"
   spec.metadata = {
     "homepage_uri" => "https://api.toneperfect.app",
     "documentation_uri" => "https://api.toneperfect.app/docs",
+    "source_code_uri" => "https://github.com/vm542/toneperfect-sdk/tree/main/ruby",
+    "changelog_uri" => "https://github.com/vm542/toneperfect-sdk/blob/main/CHANGELOG.md",
     "rubygems_mfa_required" => "true"
   }
   spec.files = Dir["lib/**/*.rb", "examples/**/*.rb", "README.md", "LICENSE"]

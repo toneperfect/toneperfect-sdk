@@ -1,2 +1,2 @@
-tags:
-  live:
+# Tests start testing/mock_api.py (python3) and talk to it over loopback.
+concurrency: 1

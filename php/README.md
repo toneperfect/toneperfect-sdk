@@ -1,64 +1,113 @@
-# toneperfect (PHP)
+# TonePerfect PHP client
 
-Client for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app), 10 languages:
-`zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR` (beta) and `ja-JP` (beta).
-Send a short scripted recording and the text it should contain, get 0–100 scores for the sentence,
-every word and every sound in one JSON response, with expected vs heard sounds and timings.
-Mandarin syllables also get separate initial, final and tone scores.
-
-One file, PHP 8.0+, `ext-curl` + `ext-json`, no Composer dependencies.
+Client for the [TonePerfect pronunciation assessment API](https://api.toneperfect.app): send a short recording
+and the text it should contain, get 0–100 scores for the sentence, every word and every sound, with Mandarin
+initial, final and tone per syllable. 10 languages. PHP 8.0+, ext-curl, no dependencies.
 
 ```sh
 composer require toneperfect/toneperfect
 ```
 
-## Quickstart
+## Try it with a test key
+
+[Sign up](https://api.toneperfect.app/signup) (50 free credits, no card), then in the dashboard open
+**API keys** and create a **test key** (`tp_test_…`). A test key runs the real request path but returns a
+fixed example result: it never scores your audio and never spends credits. Swap in a live key
+(`tp_live_…`) for real scores. Keep keys on a server.
+
+```sh
+export TONEPERFECT_API_KEY="tp_test_..."
+curl -o hello.ogg https://api.toneperfect.app/capsule/speech-zh-nihao.ogg   # 2 s of 你好
+```
 
 ```php
-$client = new TonePerfect\Client('tp_live_...');          // or set TONEPERFECT_API_KEY
-$result = $client->assess('hello.wav', ['text' => '你好', 'language' => 'zh-CN']);
-var_dump($result->assessable(), $result->overall(), $result->billing());
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+$client = new TonePerfect\Client(); // reads TONEPERFECT_API_KEY
+$result = $client->assess('hello.ogg', text: '你好', language: 'zh-CN');
+
+var_dump($result->assessable(), $result->overall(), $result->billing()->credits, $result->test());
 foreach ($result->words() as $word) {
-    echo $word['word'], ' ', $word['score'], "\n";
+    foreach ($word->phones as $phone) {
+        echo $word->word, ' ', $phone->dimension, ' ', $phone->expected, ' ', $phone->heard, ' ', $phone->score, ' ', $phone->decision, "\n";
+    }
 }
 ```
 
-Get a key: [create an account](https://api.toneperfect.app/signup) → dashboard → API keys.
-New accounts get 50 free credits, no card needed; then the Starter plan is $10/month
-([pricing](https://api.toneperfect.app/pricing/)). Keep the key on your server.
+`language` is required: `zh-CN`, `en-US`, `fr-FR`, `es-419`, `de-DE`, `it-IT`, `pt-BR`, `ru-RU`, `ko-KR` or
+`ja-JP`. `assess()` takes a path or a stream; `assessBytes()` takes the recording's bytes.
 
-## What is wrapped
+## Results
 
-| Method | Endpoint | Notes |
-| --- | --- | --- |
-| `$client->capabilities()` | `GET /v1/capabilities` | No key needed. Languages, `status`, dimensions, `limits`, `model_version`. |
-| `$client->assess($pathOrStream, [...])` / `assessBytes($bytes, [...])` | `POST /v1/assess` | Fields `text`, `language`, optional `pinyin` (`ni3 hao3`), `task` (`general`, `connected_speech`, `isolated_word`), `idempotency_key` (generated when omitted), `filename`, `content_type`. Headers `Authorization: Bearer` + `Idempotency-Key`. |
+`TonePerfect\Assessment`: `assessable()` and `reason()` (a recording that could not be scored is free and is
+not a score of zero), `overall()` and `scores()` (0–100; `null` = not measured by this pack), `words()`
+(`Word`: `word`, `score`, `startMs`, `endMs`, `decision`, `pinyin`, `phones`), `phones` (`Phone`:
+`dimension`, `expected`, `heard`, `score`, `decision`), `billing()` (`credits`, `balanceCredits`,
+`freeCredits`, `source`: `free`, `plan` or `test`), `warnings()`, `engine()`, `modelVersion()`, `id()`,
+`replayed()`, `test()`, and `$data`, the JSON as returned. Act on `decision`, not on every low grade.
+`compact: true` asks for the `toneperfect.compact.v1` schema; the same methods work on it.
 
-`TonePerfect\Assessment`: `$data` (full JSON body), `assessable()` / `reason()` (never show
-an unassessable result as zero), `scores()` (`null` = dimension not supported by the pack),
-`overall()`, `words()`, `billing()` (failed or unassessable requests charge 0),
-`modelVersion()`, `id()`, `replayed()`.
+## Errors, retries and timeouts
 
-## Errors and retries
+Every error is a `TonePerfect\TonePerfectException` with the API's `code()`, `$detail` (its message), `$status`
+and `$requestId`. Subclasses: `AuthenticationError` (401), `PaymentRequiredError` (402, with `$billingUrl` and,
+when the API sends them, `$pricingUrl` and `$plan`), `RateLimitError` (429), `ValidationError` (other 4xx),
+`ServerError` (5xx) and `APIConnectionError` (timeout or network failure). The client retries a failure that
+stored nothing (`retryable()`) up to `maxRetries` times with the **same** Idempotency-Key, so a finished result
+is returned and charged once; `needsNewKey()` marks a failure stored under the key. A test key rehearses each
+outcome:
 
-Every non-2xx response throws a `TonePerfect\TonePerfectException` subclass —
-`AuthenticationError` (401), `PaymentRequiredError` (402, nothing charged),
-`RateLimitError` (429), `ValidationError` (other 4xx), `ServerError` (5xx),
-`APIConnectionError` (transport, `status` 0, `timeout` / `network_error`) — with `status`,
-`code()`, `detail`, `requestId`, `retryAfter`, `body`. `retryable()` → retry later with the
-**same** `idempotency_key`; `needsNewKey()` (incl. `finalized()`) → new attempt, new key.
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
 
-## Scope
+use TonePerfect\{Client, PaymentRequiredError, TonePerfectException};
 
-Scripted speech only: the learner reads a known text. Grades are display scores calibrated
-per language against native references — not accuracy percentages and not comparable
-across vendors. Every language pack is labelled `experimental` in `/v1/capabilities`.
+$client = new Client(timeout: 30, maxRetries: 2);
+try {
+    $client->assess('hello.ogg', text: '你好', language: 'zh-CN', testOutcome: 'subscription_required');
+} catch (PaymentRequiredError $e) {
+    echo $e->code(), ' -> ', $e->billingUrl, "\n";
+} catch (TonePerfectException $e) {
+    echo $e->status, ' ', $e->code(), ' ', $e->detail, ' ', var_export($e->retryable(), true), "\n";
+}
 
-## Development
-
-```sh
-php tests/run.php     # offline: fake transport + php -S on loopback
-composer validate --strict
+$unscored = $client->assess('hello.ogg', text: '你好', language: 'zh-CN', testOutcome: 'unassessable');
+var_dump($unscored->assessable(), $unscored->reason());
 ```
 
-MIT licensed. Docs: https://api.toneperfect.app/docs · Questions: nik@toneperfect.app
+To resend the same recording safely after a crash, keep your own key:
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+$client = new TonePerfect\Client();
+$key = TonePerfect\new_idempotency_key(); // store it with the recording
+$first = $client->assess('hello.ogg', text: 'I like sunny days', language: 'en-US', idempotencyKey: $key);
+$again = $client->assess('hello.ogg', text: 'I like sunny days', language: 'en-US', idempotencyKey: $key);
+var_dump($first->id() === $again->id(), $again->replayed()); // the stored result, not charged twice
+```
+
+## Other endpoints
+
+```php
+<?php
+require __DIR__ . '/vendor/autoload.php';
+
+$client = new TonePerfect\Client();
+print_r($client->lint('我有3个苹果', 'zh-CN')['issues']); // free reference-text check, no key
+echo $client->status()['status'], "\n";                 // synthetic engine probe
+```
+
+## Configuration
+
+`new TonePerfect\Client(apiKey: null, baseUrl: null, timeout: 60.0, maxRetries: 2, headers: [])`. `apiKey`
+defaults to `TONEPERFECT_API_KEY`, `baseUrl` to `TONEPERFECT_BASE_URL`, else `https://api.toneperfect.app` (a proxy
+with a 26-second limit: a longer passage comes back on the automatic retry, charged once). `headers` adds headers
+to every request, for example `['TonePerfect-Fallback' => 'off']`.
+
+Grades are display scores calibrated per language against native references, not accuracy percentages and not
+comparable across vendors. Every language pack is labelled `experimental` in `/v1/capabilities`.
+Docs: https://api.toneperfect.app/docs · MIT licence · nik@toneperfect.app

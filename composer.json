@@ -1,0 +1,43 @@
+{
+    "name": "toneperfect/toneperfect",
+    "description": "Client for the TonePerfect pronunciation assessment API, 10 languages: sentence, word and sound scores for a recording of a known text.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "pronunciation",
+        "speech",
+        "assessment",
+        "pronunciation-assessment",
+        "mandarin",
+        "tones",
+        "language-learning",
+        "api-client",
+        "sdk"
+    ],
+    "homepage": "https://api.toneperfect.app",
+    "support": {
+        "email": "nik@toneperfect.app",
+        "docs": "https://api.toneperfect.app/docs",
+        "source": "https://github.com/vm542/toneperfect-sdk/tree/main/php",
+        "issues": "https://github.com/vm542/toneperfect-sdk/issues"
+    },
+    "authors": [
+        {
+            "name": "TonePerfect",
+            "email": "nik@toneperfect.app"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "files": [
+            "php/src/TonePerfect.php"
+        ]
+    },
+    "scripts": {
+        "test": "php php/tests/run.php"
+    }
+}

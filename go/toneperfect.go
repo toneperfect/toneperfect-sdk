@@ -1,95 +1,102 @@
 // Package toneperfect is a client for the TonePerfect pronunciation assessment API
-// (https://api.toneperfect.app). Standard library only.
+// (https://api.toneperfect.app), standard library only, Go 1.21+.
 //
-// It wraps the two public endpoints:
+// It wraps the public endpoints:
 //
-//	GET  /v1/capabilities   -> languages served, limits, model version (no key needed)
-//	POST /v1/assess         -> score one scripted recording
+//	GET  /v1/capabilities  languages served, limits, model version (no key)
+//	POST /v1/assess        score one scripted recording
+//	POST /v1/lint          check a reference text before recording (free, no key)
+//	GET  /v1/status        synthetic engine probe summary (free, no key)
 //
-// Accounts, API keys and billing are managed in the web dashboard
-// (https://api.toneperfect.app/dashboard); those routes are session-based and are
-// deliberately not wrapped. Full reference: https://api.toneperfect.app/docs
+// Accounts, API keys and billing are managed in the web dashboard; those routes are
+// session-based and deliberately not wrapped. Reference: https://api.toneperfect.app/docs
 //
-//	client := toneperfect.New("tp_live_...") // or "" to read TONEPERFECT_API_KEY
-//	res, err := client.AssessFile(ctx, "hello.wav", toneperfect.AssessParams{Text: "你好", Language: "zh-CN"})
+//	client := toneperfect.New("") // reads TONEPERFECT_API_KEY
+//	res, err := client.AssessFile(ctx, "hello.ogg", toneperfect.AssessParams{Text: "你好", Language: "zh-CN"})
 package toneperfect
 
 import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	mrand "math/rand"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"net/textproto"
 	"os"
-	"regexp"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Version of this client.
-const Version = "0.1.0"
+// Version of this client, sent in the User-Agent.
+const Version = "0.3.0"
 
-// DefaultBaseURL is the public API origin. It sits behind a proxy with a 26-second request
-// timeout; if your assessments run longer, ask nik@toneperfect.app for the direct gateway address.
+// DefaultBaseURL is the public API origin.
 const DefaultBaseURL = "https://api.toneperfect.app"
 
-// Tasks accepted by POST /v1/assess.
+// BillingURL is where a 402 is fixed. A 402 from the API may carry its own billing_url.
+const BillingURL = "https://api.toneperfect.app/dashboard?tab=billing"
+
+// Tasks accepted in AssessParams.Task.
 var Tasks = []string{"general", "connected_speech", "isolated_word"}
 
-// Decisions are the values of "decision" on words and phones. review / uncertain / no_correction
-// are the feedback decisions; unassessable, partial and legacy_correction also occur. Treat
-// unknown values as "no decision".
+// TestOutcomes a tp_test_ key can rehearse (AssessParams.TestOutcome).
+var TestOutcomes = []string{"success", "unassessable", "invalid_assessment", "engine_unavailable", "subscription_required",
+	"subscription_past_due", "insufficient_credits", "account_busy", "rate_limit"}
+
+// Decisions on words and phones. review / uncertain / no_correction are the feedback decisions;
+// unassessable, partial and legacy_correction also occur. Treat unknown values as "no decision".
 var Decisions = []string{"review", "uncertain", "no_correction", "unassessable", "partial", "legacy_correction"}
 
-// RetrySameKeyCodes are error codes after which the SAME Idempotency-Key must be retried:
-// nothing was finalized.
+// RetrySameKeyCodes: after these the SAME Idempotency-Key is retried, nothing was stored under it.
 var RetrySameKeyCodes = map[string]bool{
-	"rate_limit": true, "account_busy": true, "gateway_busy": true, "decoder_busy": true,
-	"audio_decoder_unavailable": true, "upload_timeout": true, "request_pending": true,
-	"timeout": true, "network_error": true,
+	"rate_limit": true, "account_busy": true, "uploads_in_progress": true, "gateway_busy": true, "decoder_busy": true,
+	"audio_decoder_unavailable": true, "upload_timeout": true, "request_pending": true, "request_interrupted": true,
+	"engine_unavailable": true, "result_held": true, "timeout": true, "network_error": true,
 }
 
-// NewKeyCodes are error codes that mean the key is spent: start a new attempt with a new key.
+// NewKeyCodes mean the key is spent: start a new attempt with a new key.
 var NewKeyCodes = map[string]bool{"idempotency_expired": true, "idempotency_conflict": true}
 
-var idempotencyRE = regexp.MustCompile(`^[A-Za-z0-9_.:-]{8,128}$`)
+// notRetryable: free_capacity (429) clears at the next UTC day, or at once with a paid plan.
+var notRetryable = map[string]bool{"free_capacity": true}
 
-// NewIdempotencyKey returns a fresh key for one recording attempt. Keep the same key while the
-// result is unknown or pending (Error.Retryable); use a new key for a different attempt or after
-// a definite failed response (Error.NeedsNewKey). Never generate one inside an automatic retry loop.
-func NewIdempotencyKey(prefix string) (string, error) {
-	if prefix == "" {
-		prefix = "tp"
+var contentTypes = map[string]string{".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".mp4": "audio/mp4", ".aac": "audio/aac",
+	".ogg": "audio/ogg", ".oga": "audio/ogg", ".opus": "audio/ogg", ".webm": "audio/webm", ".flac": "audio/flac"}
+
+// NewIdempotencyKey returns a fresh key (a UUID) for one recording attempt. Assess makes one per call
+// and reuses it for its own retries; pass your own to resend the same recording safely across restarts.
+func NewIdempotencyKey() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(err)
 	}
-	b := make([]byte, 18)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	key := prefix + "-" + hex.EncodeToString(b[:16]) + "-" + hex.EncodeToString(b[16:])
-	if !idempotencyRE.MatchString(key) {
-		return "", errors.New("toneperfect: prefix must be letters, digits, dots, dashes, underscores or colons")
-	}
-	return key, nil
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-// ErrorKind classifies an Error the same way the other SDKs use exception classes.
+// ---------------------------------------------------------------- errors
+
+// ErrorKind names the error class shared with the other SDKs.
 type ErrorKind string
 
+// Error classes.
 const (
 	KindAuthentication  ErrorKind = "AuthenticationError"  // 401 invalid_api_key
-	KindPaymentRequired ErrorKind = "PaymentRequiredError" // 402 subscription_required, insufficient_credits, payment_balance_due (nothing charged)
-	KindRateLimit       ErrorKind = "RateLimitError"       // 429 rate_limit (60/min) or account_busy (2 running)
+	KindPaymentRequired ErrorKind = "PaymentRequiredError" // 402: nothing charged; see BillingURL
+	KindRateLimit       ErrorKind = "RateLimitError"       // 429
 	KindValidation      ErrorKind = "ValidationError"      // other 4xx: fix the request
-	KindServer          ErrorKind = "ServerError"          // 5xx
-	KindAPIConnection   ErrorKind = "APIConnectionError"   // transport failure, Status 0: timeout or network_error
+	KindServer          ErrorKind = "ServerError"          // 5xx: never stored, never charged
+	KindAPIConnection   ErrorKind = "APIConnectionError"   // Status 0: timeout or network_error
 	KindOther           ErrorKind = "TonePerfectError"
 )
 
@@ -103,25 +110,28 @@ var (
 	ErrAPIConnection   = errors.New("toneperfect: connection error")
 )
 
-// Error is returned for any non-2xx response and for transport failures (Status 0).
-//
-// Code and Message come from the API's "error" object. A non-JSON body (for example an HTML 502
-// from a proxy) gets Code "http_error" and the raw text as the message. What to do next is
-// decided by the BODY, not the status:
-//   - Finalized: the failure was stored under this Idempotency-Key (body carries a req_… id and
-//     billing with credits 0). The same key replays it for 24 h, so NeedsNewKey is true.
-//   - Retryable: nothing was finalized; retry later with the SAME key.
-//   - anything else (invalid_api_key, insufficient_credits, invalid_audio, …) needs a fix on your side.
+// Error is returned for each non-2xx response and each transport failure (Status 0).
+// Code and Message come from the API's "error" object; branch on Code.
+//   - Retryable: nothing was stored under the key; the client already retried with the SAME key.
+//   - NeedsNewKey: the failure is stored under the key (Finalized: a 4xx with a req_… ID and Billing,
+//     such as invalid_assessment) or the key expired or conflicts.
+//   - otherwise: fix the request (invalid_api_key, invalid_audio, unsupported_language, …).
 type Error struct {
-	Status     int
-	Code       string
-	Message    string
-	RequestID  string
-	RetryAfter *float64
-	Body       map[string]any
-	// ID is the req_… result id when the failure was finalized under your Idempotency-Key.
+	Status         int
+	Code           string
+	Message        string
+	RequestID      string
+	RetryAfter     *float64
+	Body           map[string]any
+	IdempotencyKey string
+	// ID is the req_… result id when the failure is stored under the key.
 	ID      string
 	Billing map[string]any
+	// BillingURL (402): where to start, renew or fix a plan: the API's link, else the dashboard billing tab.
+	BillingURL string
+	// PricingURL and Plan (402): the plans page and the least expensive plan on sale, when the API sends them.
+	PricingURL string
+	Plan       map[string]any
 }
 
 func newError(status int, code, message, requestID string, retryAfter *float64, body map[string]any) *Error {
@@ -135,10 +145,24 @@ func newError(status int, code, message, requestID string, retryAfter *float64, 
 	if b, ok := e.Body["billing"].(map[string]any); ok {
 		e.Billing = b
 	}
+	if obj, ok := e.Body["error"].(map[string]any); ok {
+		e.BillingURL, _ = obj["billing_url"].(string)
+		e.PricingURL, _ = obj["pricing_url"].(string)
+		e.Plan, _ = obj["plan"].(map[string]any)
+	}
+	if e.BillingURL == "" && status == 402 {
+		e.BillingURL = BillingURL
+	}
 	return e
 }
 
-func (e *Error) Error() string { return fmt.Sprintf("%d %s: %s", e.Status, e.Code, e.Message) }
+func (e *Error) Error() string {
+	text := fmt.Sprintf("%d %s: %s", e.Status, e.Code, e.Message)
+	if e.BillingURL != "" && !strings.Contains(e.Message, e.BillingURL) {
+		text += " (" + e.BillingURL + ")"
+	}
+	return text
+}
 
 // Kind maps the HTTP status to the error class used by the other SDKs.
 func (e *Error) Kind() ErrorKind {
@@ -178,221 +202,259 @@ func (e *Error) Is(target error) bool {
 	return false
 }
 
-// Finalized reports that the failure is a stored result for this key (id + billing present).
-func (e *Error) Finalized() bool { return e.ID != "" && e.Billing != nil }
+// Finalized reports a stored result for this key: a 4xx with ID and Billing. A 5xx is never stored.
+func (e *Error) Finalized() bool { return e.ID != "" && e.Billing != nil && e.Status < 500 }
 
 // NeedsNewKey: start a new attempt with a new Idempotency-Key; the old key replays this response.
 func (e *Error) NeedsNewKey() bool { return e.Finalized() || NewKeyCodes[e.Code] }
 
-// Retryable: retry later with the SAME Idempotency-Key, nothing was finalized.
+// Retryable: retry later with the SAME Idempotency-Key, nothing was stored under it.
 func (e *Error) Retryable() bool {
-	if e.Finalized() || NewKeyCodes[e.Code] {
+	if e.Finalized() || NewKeyCodes[e.Code] || notRetryable[e.Code] {
 		return false
 	}
 	if RetrySameKeyCodes[e.Code] {
 		return true
 	}
 	switch e.Status {
-	case 408, 429, 502, 503, 504:
+	case 0, 408, 429, 502, 503, 504:
 		return true
 	}
 	return false
 }
 
-// Assessment is one POST /v1/assess result. Data is the full JSON body exactly as returned.
+// ---------------------------------------------------------------- results
+
+// Phone is one scored unit under a word: a phoneme, or a Mandarin initial, final or tone.
+type Phone struct {
+	Dimension string   `json:"dimension"`
+	Expected  any      `json:"expected"` // a string, or a tone number
+	Heard     any      `json:"heard"`
+	Score     *float64 `json:"score"`    // nil = not scored
+	Decision  string   `json:"decision"` // "" when absent
+}
+
+// Word is one word (one character in Mandarin). Full and compact responses fill the same fields.
+type Word struct {
+	Word     string   `json:"word"`
+	Score    *float64 `json:"score"`
+	StartMs  *float64 `json:"start_ms"`
+	EndMs    *float64 `json:"end_ms"`
+	Decision string   `json:"decision"`
+	Pinyin   string   `json:"pinyin"`
+	Phones   []Phone  `json:"phones"`
+	// Text and Units are the compact schema's names; they are copied into Word and Phones.
+	Text  string  `json:"text"`
+	Units []Phone `json:"units"`
+}
+
+// Billing is what the request cost.
+type Billing struct {
+	Credits        int    `json:"credits"`
+	BalanceCredits *int   `json:"balance_credits"`
+	FreeCredits    *int   `json:"free_credits"`
+	Source         string `json:"source"` // free, plan or test
+}
+
+// EngineRoute says which engine answered (fallback scores are calibrated differently).
+type EngineRoute struct {
+	Engine   string `json:"engine"` // primary or fallback
+	Fallback bool   `json:"fallback"`
+}
+
+// Assessment is one POST /v1/assess result. Raw is the JSON body as returned; Decode reads any other field.
 type Assessment struct {
-	Data      map[string]any
-	Raw       []byte
-	Status    int
-	Header    http.Header
-	RequestID string
-	// Replayed is true when the result was served from a previous identical request (not charged again).
-	Replayed bool
+	ID           string              `json:"id"`
+	Schema       string              `json:"schema"` // toneperfect.compact.v1 for a compact response
+	Assessable   bool                `json:"assessable"`
+	Reason       string              `json:"reason"` // why it was not assessable; never show that as a zero score
+	Locale       string              `json:"locale"`
+	Task         string              `json:"task"`
+	ModelVersion string              `json:"model_version"`
+	Scores       map[string]*float64 `json:"scores"` // 0–100; nil = not measured by this pack
+	Words        []Word              `json:"words"`
+	Warnings     []any               `json:"warnings"`
+	EngineRoute  *EngineRoute        `json:"engine_route"`
+	Billing      Billing             `json:"billing"`
+	Test         bool                `json:"test"` // a fixed example from a tp_test_ key
+
+	HTTPStatus     int             `json:"-"`
+	RequestID      string          `json:"-"`
+	Replayed       bool            `json:"-"`
+	IdempotencyKey string          `json:"-"`
+	Header         http.Header     `json:"-"`
+	Raw            json.RawMessage `json:"-"`
 }
 
-// Assessable is false when the audio could not be meaningfully scored (silence, wrong sentence,
-// unreadable). Never show an unassessable result as a score of zero; see Reason.
-func (a *Assessment) Assessable() bool { v, _ := a.Data["assessable"].(bool); return v }
+// Overall is scores.overall (nil when not measured).
+func (a *Assessment) Overall() *float64 { return a.Scores["overall"] }
 
-// Reason explains why a result is not assessable ("" when absent).
-func (a *Assessment) Reason() string { v, _ := a.Data["reason"].(string); return v }
-
-// Scores holds 0-100 display grades per dimension; a nil value means the dimension is not
-// supported by this pack.
-func (a *Assessment) Scores() map[string]*float64 {
-	out := map[string]*float64{}
-	m, _ := a.Data["scores"].(map[string]any)
-	for k, v := range m {
-		if f, ok := v.(float64); ok {
-			f := f
-			out[k] = &f
-		} else {
-			out[k] = nil
-		}
+// Engine is "primary" or "fallback".
+func (a *Assessment) Engine() string {
+	if a.EngineRoute != nil {
+		return a.EngineRoute.Engine
 	}
-	return out
+	return a.Header.Get("X-TonePerfect-Engine")
 }
 
-// Overall is scores.overall, nil when absent or null.
-func (a *Assessment) Overall() *float64 { return a.Scores()["overall"] }
-
-// Words are the per word/character rows: score, start_ms/end_ms and phones (expected, heard,
-// score, decision; see Decisions).
-func (a *Assessment) Words() []map[string]any {
-	list, _ := a.Data["words"].([]any)
-	out := make([]map[string]any, 0, len(list))
-	for _, w := range list {
-		if m, ok := w.(map[string]any); ok {
-			out = append(out, m)
-		}
-	}
-	return out
-}
-
-// Billing is {"credits": charged, "balance_credits": remaining}; failed or unassessable requests charge 0.
-func (a *Assessment) Billing() map[string]any {
-	m, _ := a.Data["billing"].(map[string]any)
-	if m == nil {
-		return map[string]any{}
-	}
-	return m
-}
-
-// ModelVersion is the model_version field ("" when absent).
-func (a *Assessment) ModelVersion() string { v, _ := a.Data["model_version"].(string); return v }
-
-// ID is the result id (req_…), also returned in the X-Request-Id header.
-func (a *Assessment) ID() string {
-	if v, ok := a.Data["id"].(string); ok && v != "" {
-		return v
-	}
-	return a.RequestID
-}
-
-// Decode unmarshals the raw response body into v (for typed structs of your own).
+// Decode unmarshals the raw body into v, for fields this struct does not name (syllables, heard, timings).
 func (a *Assessment) Decode(v any) error { return json.Unmarshal(a.Raw, v) }
 
-// AssessParams are the fields of one POST /v1/assess.
-type AssessParams struct {
-	// Text the learner was asked to read. Required unless Pinyin is given (Mandarin only).
-	Text string
-	// Language is a locale such as zh-CN, en-US, fr-FR (default zh-CN). See Capabilities.
-	Language string
-	// Pinyin is an explicit Mandarin reading with numbered tones, e.g. "ni3 hao3".
-	Pinyin string
-	// Task is general (default), connected_speech or isolated_word.
-	Task string
-	// IdempotencyKey is unique per recording attempt; generated when empty. If a network error
-	// prevents you from receiving a result, retry with the same key and identical inputs: a
-	// completed request is returned without charging again, including a completed failure.
-	IdempotencyKey string
-	// Filename sent with the audio part (default recording.wav).
-	Filename string
-	// ContentType of the audio part (default application/octet-stream).
-	ContentType string
+// LintIssue is one finding of POST /v1/lint.
+type LintIssue struct {
+	Code     string `json:"code"`
+	Message  string `json:"message"`
+	Field    string `json:"field"`
+	Severity string `json:"severity"` // error or warning
 }
 
-// Client talks to https://api.toneperfect.app. The zero value is not usable; call New.
+// LintResult is the POST /v1/lint answer.
+type LintResult struct {
+	OK       bool        `json:"ok"`
+	Language string      `json:"language"`
+	Issues   []LintIssue `json:"issues"`
+	Units    int         `json:"units"`
+}
+
+// ---------------------------------------------------------------- client
+
+// AssessParams are the fields of one assessment. Language is required.
+type AssessParams struct {
+	Text     string // what the learner was asked to say (Mandarin may send toned Pinyin instead)
+	Language string // zh-CN, en-US, fr-FR, es-419, de-DE, it-IT, pt-BR, ru-RU, ko-KR or ja-JP
+	Pinyin   string // Mandarin: picks the reading of a polyphone next to characters, or toned pinyin alone
+	Task     string // general (default), connected_speech or isolated_word
+	// IdempotencyKey: one per recording attempt; made for you and reused by the automatic retries.
+	IdempotencyKey string
+	Filename       string // default: the file's name (AssessFile), else "recording"
+	ContentType    string // default: from the file extension
+	Compact        bool   // the stable compact schema (toneperfect.compact.v1)
+	TestOutcome    string // tp_test_ keys only: one of TestOutcomes
+}
+
+// Client calls the API. Build it with New.
 type Client struct {
 	APIKey     string
 	BaseURL    string
 	HTTPClient *http.Client
+	MaxRetries int
+	Headers    map[string]string
 	UserAgent  string
 }
 
-// Option customises a Client.
+// Option configures a Client.
 type Option func(*Client)
 
-// WithBaseURL overrides the API origin.
+// WithBaseURL sets the API origin (default: TONEPERFECT_BASE_URL, else https://api.toneperfect.app).
 func WithBaseURL(u string) Option { return func(c *Client) { c.BaseURL = strings.TrimRight(u, "/") } }
 
-// WithHTTPClient sets the http.Client (timeouts, proxies, tests).
+// WithHTTPClient replaces the HTTP client.
 func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.HTTPClient = h } }
 
-// WithTimeout sets the per-request timeout (default 90 s).
+// WithTimeout sets the per-request timeout (default 60 s).
 func WithTimeout(d time.Duration) Option {
 	return func(c *Client) { c.HTTPClient = &http.Client{Timeout: d} }
 }
 
-// WithUserAgent overrides the User-Agent header.
+// WithMaxRetries sets the automatic retries of a retryable failure, with the same key (default 2).
+func WithMaxRetries(n int) Option { return func(c *Client) { c.MaxRetries = n } }
+
+// WithHeader adds a header to every request, e.g. WithHeader("TonePerfect-Fallback", "off").
+func WithHeader(name, value string) Option { return func(c *Client) { c.Headers[name] = value } }
+
+// WithUserAgent replaces the User-Agent.
 func WithUserAgent(ua string) Option { return func(c *Client) { c.UserAgent = ua } }
 
-// New returns a client. An empty apiKey falls back to $TONEPERFECT_API_KEY.
+// New builds a client. An empty apiKey reads TONEPERFECT_API_KEY (tp_live_…, or a tp_test_… test key).
 func New(apiKey string, opts ...Option) *Client {
 	if apiKey == "" {
 		apiKey = os.Getenv("TONEPERFECT_API_KEY")
 	}
-	c := &Client{
-		APIKey:     apiKey,
-		BaseURL:    DefaultBaseURL,
-		HTTPClient: &http.Client{Timeout: 90 * time.Second},
-		UserAgent:  "toneperfect-go/" + Version,
+	base := os.Getenv("TONEPERFECT_BASE_URL")
+	if base == "" {
+		base = DefaultBaseURL
 	}
+	c := &Client{APIKey: apiKey, BaseURL: strings.TrimRight(base, "/"), HTTPClient: &http.Client{Timeout: 60 * time.Second},
+		MaxRetries: 2, Headers: map[string]string{}, UserAgent: "toneperfect-go/" + Version}
 	for _, o := range opts {
 		o(c)
 	}
 	return c
 }
 
-// Capabilities calls GET /v1/capabilities: languages (locale, status, dimensions, limitations),
-// limits, model_version. No API key required.
+// Capabilities is GET /v1/capabilities (no key): languages, limits, model version.
 func (c *Client) Capabilities(ctx context.Context) (map[string]any, error) {
-	status, header, raw, err := c.send(ctx, http.MethodGet, "/v1/capabilities", nil, nil)
+	var out map[string]any
+	_, err := c.call(ctx, "GET", "/v1/capabilities", nil, nil, "", &out)
+	return out, err
+}
+
+// Status is GET /v1/status (no key): the synthetic engine probe.
+func (c *Client) Status(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	_, err := c.call(ctx, "GET", "/v1/status", nil, nil, "", &out)
+	return out, err
+}
+
+// Lint is POST /v1/lint (free, no key): the engine's reference rules without audio.
+func (c *Client) Lint(ctx context.Context, text, language, pinyin string) (*LintResult, error) {
+	if language == "" {
+		return nil, errors.New("toneperfect: language is required, for example \"en-US\" or \"zh-CN\"")
+	}
+	body, _ := json.Marshal(map[string]string{"text": text, "language": language, "pinyin": pinyin, "task": "general"})
+	var out LintResult
+	_, err := c.call(ctx, "POST", "/v1/lint", func() (io.Reader, string) { return bytes.NewReader(body), "application/json" }, nil, "", &out)
 	if err != nil {
 		return nil, err
 	}
-	return parseJSON(status, header, raw)
+	return &out, nil
 }
 
-// AssessFile reads the recording from path and calls Assess.
+// AssessFile reads a recording from disk and assesses it (file name and content type from the path).
 func (c *Client) AssessFile(ctx context.Context, path string, p AssessParams) (*Assessment, error) {
-	data, err := os.ReadFile(path)
+	audio, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return c.Assess(ctx, data, p)
+	if p.Filename == "" {
+		p.Filename = filepath.Base(path)
+	}
+	return c.Assess(ctx, audio, p)
 }
 
-// Assess calls POST /v1/assess: score one scripted recording (up to 30 s and 10 MB; WAV, MP3,
-// M4A, Ogg, WebM) against its reference text. Every non-2xx status returns *Error.
+// Assess is POST /v1/assess: score one scripted recording (WAV, MP3, M4A, Ogg or WebM, 0.15–120 s, up to 10 MB).
+// Failures are *Error; retryable ones were already retried with the same Idempotency-Key.
 func (c *Client) Assess(ctx context.Context, audio []byte, p AssessParams) (*Assessment, error) {
 	if c.APIKey == "" {
 		return nil, newError(401, "invalid_api_key", "Set the API key or the TONEPERFECT_API_KEY environment variable.", "", nil, nil)
 	}
+	if p.Language == "" {
+		return nil, errors.New("toneperfect: Language is required, for example \"en-US\" or \"zh-CN\"")
+	}
 	if p.Task == "" {
 		p.Task = "general"
 	}
-	validTask := false
-	for _, t := range Tasks {
-		validTask = validTask || t == p.Task
-	}
-	if !validTask {
-		return nil, fmt.Errorf("toneperfect: task must be one of %s", strings.Join(Tasks, ", "))
-	}
 	if p.Text == "" && p.Pinyin == "" {
-		return nil, errors.New("toneperfect: provide Text (or Pinyin for Mandarin)")
-	}
-	if p.Language == "" {
-		p.Language = "zh-CN"
-	}
-	if p.Filename == "" {
-		p.Filename = "recording.wav"
-	}
-	if p.ContentType == "" {
-		p.ContentType = "application/octet-stream"
+		return nil, errors.New("toneperfect: provide Text (or, for Mandarin, Pinyin with tones)")
 	}
 	key := p.IdempotencyKey
 	if key == "" {
-		var err error
-		if key, err = NewIdempotencyKey("tp"); err != nil {
-			return nil, err
-		}
-	} else if !idempotencyRE.MatchString(key) {
-		return nil, errors.New("toneperfect: IdempotencyKey must be 8-128 letters, digits, dots, dashes, underscores or colons")
+		key = NewIdempotencyKey()
 	}
-
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
+	if len(key) > 255 || strings.IndexFunc(key, func(r rune) bool { return r < 0x20 || r > 0x7e }) >= 0 {
+		return nil, errors.New("toneperfect: IdempotencyKey must be 1-255 printable ASCII characters (a UUID works everywhere)")
+	}
+	name := p.Filename
+	if name == "" {
+		name = "recording"
+	}
+	ctype := p.ContentType
+	if ctype == "" {
+		ctype = contentTypes[strings.ToLower(filepath.Ext(name))]
+		if ctype == "" {
+			ctype = "application/octet-stream"
+		}
+	}
 	fields := [][2]string{{"language", p.Language}, {"task", p.Task}}
 	if p.Text != "" {
 		fields = append(fields, [2]string{"text", p.Text})
@@ -400,57 +462,110 @@ func (c *Client) Assess(ctx context.Context, audio []byte, p AssessParams) (*Ass
 	if p.Pinyin != "" {
 		fields = append(fields, [2]string{"pinyin", p.Pinyin})
 	}
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
 	for _, f := range fields {
-		if err := w.WriteField(f[0], f[1]); err != nil {
-			return nil, err
-		}
+		_ = w.WriteField(f[0], f[1])
 	}
 	h := make(textproto.MIMEHeader)
-	safe := strings.NewReplacer(`"`, "_", "\r", "", "\n", "").Replace(p.Filename)
-	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="audio"; filename="%s"`, safe))
-	h.Set("Content-Type", p.ContentType)
-	part, err := w.CreatePart(h)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="audio"; filename=%q`, strings.NewReplacer("\r", "", "\n", "").Replace(name)))
+	h.Set("Content-Type", ctype)
+	part, _ := w.CreatePart(h)
+	_, _ = part.Write(audio)
+	_ = w.Close()
+	payload, formType := buf.Bytes(), w.FormDataContentType()
+	headers := map[string]string{"Authorization": "Bearer " + c.APIKey, "Idempotency-Key": key}
+	if p.Compact {
+		headers["TonePerfect-Response"] = "compact"
+	}
+	if p.TestOutcome != "" {
+		headers["TonePerfect-Test-Outcome"] = p.TestOutcome
+	}
+	var a Assessment
+	resp, err := c.call(ctx, "POST", "/v1/assess", func() (io.Reader, string) { return bytes.NewReader(payload), formType }, headers, key, &a)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := part.Write(audio); err != nil {
-		return nil, err
+	for i := range a.Words {
+		if a.Words[i].Word == "" {
+			a.Words[i].Word = a.Words[i].Text
+		}
+		if a.Words[i].Phones == nil {
+			a.Words[i].Phones = a.Words[i].Units
+		}
 	}
-	if err := w.Close(); err != nil {
-		return nil, err
+	a.HTTPStatus, a.RequestID, a.Header, a.Raw = resp.status, resp.header.Get("X-Request-Id"), resp.header, resp.raw
+	a.Replayed = strings.EqualFold(resp.header.Get("Idempotent-Replayed"), "true")
+	a.IdempotencyKey = key
+	if echoed := resp.header.Get("Idempotency-Key"); echoed != "" {
+		a.IdempotencyKey = echoed
 	}
-
-	headers := map[string]string{
-		"Authorization":   "Bearer " + c.APIKey,
-		"Idempotency-Key": key,
-		"Content-Type":    w.FormDataContentType(),
+	if a.ID == "" {
+		a.ID = a.RequestID
 	}
-	status, header, raw, err := c.send(ctx, http.MethodPost, "/v1/assess", buf.Bytes(), headers)
-	if err != nil {
-		return nil, err
-	}
-	data, err := parseJSON(status, header, raw)
-	if err != nil {
-		return nil, err
-	}
-	return &Assessment{
-		Data: data, Raw: raw, Status: status, Header: header,
-		RequestID: header.Get("X-Request-Id"),
-		Replayed:  strings.EqualFold(header.Get("Idempotent-Replayed"), "true"),
-	}, nil
+	return &a, nil
 }
 
-func (c *Client) send(ctx context.Context, method, path string, body []byte, headers map[string]string) (int, http.Header, []byte, error) {
+type response struct {
+	status int
+	header http.Header
+	raw    []byte
+}
+
+func (c *Client) call(ctx context.Context, method, path string, body func() (io.Reader, string), headers map[string]string, key string, out any) (*response, error) {
+	for attempt := 0; ; attempt++ {
+		resp, err := c.send(ctx, method, path, body, headers)
+		if err == nil {
+			err = parse(resp, out)
+		}
+		if err == nil {
+			return resp, nil
+		}
+		var e *Error
+		if !errors.As(err, &e) {
+			return nil, err
+		}
+		e.IdempotencyKey = key
+		if attempt >= c.MaxRetries || !e.Retryable() {
+			return nil, e
+		}
+		select {
+		case <-ctx.Done():
+			return nil, e
+		case <-time.After(backoff(e, attempt)):
+		}
+	}
+}
+
+func backoff(e *Error, attempt int) time.Duration {
+	if e.RetryAfter != nil {
+		return time.Duration(math.Max(0, math.Min(*e.RetryAfter, 30)) * float64(time.Second))
+	}
+	base := 0.5
+	if e.Code == "engine_unavailable" {
+		base = 2
+	}
+	return time.Duration((math.Min(base*math.Pow(2, float64(attempt)), 8) + mrand.Float64()*0.25) * float64(time.Second))
+}
+
+func (c *Client) send(ctx context.Context, method, path string, body func() (io.Reader, string), headers map[string]string) (*response, error) {
 	var reader io.Reader
+	var ctype string
 	if body != nil {
-		reader = bytes.NewReader(body)
+		reader, ctype = body()
 	}
 	req, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(c.BaseURL, "/")+path, reader)
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
+	if ctype != "" {
+		req.Header.Set("Content-Type", ctype)
+	}
+	for k, v := range c.Headers {
+		req.Header.Set(k, v)
+	}
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -464,50 +579,51 @@ func (c *Client) send(ctx context.Context, method, path string, body []byte, hea
 		var raw []byte
 		raw, err = io.ReadAll(resp.Body)
 		if err == nil {
-			return resp.StatusCode, resp.Header, raw, nil
+			return &response{resp.StatusCode, resp.Header, raw}, nil
 		}
 	}
 	var netErr net.Error
 	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
-		return 0, nil, nil, newError(0, "timeout", "No response in time; the outcome is unknown, retry with the same Idempotency-Key.", "", nil, nil)
+		return nil, newError(0, "timeout", "No response in time; the outcome is unknown, retry with the same Idempotency-Key.", "", nil, nil)
 	}
-	return 0, nil, nil, newError(0, "network_error", fmt.Sprintf("Could not reach %s: %v", c.BaseURL, err), "", nil, nil)
+	return nil, newError(0, "network_error", fmt.Sprintf("Could not reach %s: %v", c.BaseURL, err), "", nil, nil)
 }
 
-func parseJSON(status int, header http.Header, raw []byte) (map[string]any, error) {
+func parse(resp *response, out any) error {
 	var data map[string]any
-	var parsed bool
-	if len(bytes.TrimSpace(raw)) == 0 {
-		data, parsed = map[string]any{}, true
-	} else {
-		parsed = json.Unmarshal(raw, &data) == nil && data != nil
-	}
-	if status >= 200 && status < 300 && parsed {
-		return data, nil
+	parsed := len(bytes.TrimSpace(resp.raw)) > 0 && json.Unmarshal(resp.raw, &data) == nil && data != nil
+	if resp.status >= 200 && resp.status < 300 && parsed {
+		if err := json.Unmarshal(resp.raw, out); err != nil {
+			return fmt.Errorf("toneperfect: unexpected response shape: %w", err)
+		}
+		return nil
 	}
 	var retryAfter *float64
-	if v := header.Get("Retry-After"); v != "" {
+	if v := resp.header.Get("Retry-After"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			retryAfter = &f
 		}
 	}
+	rid := resp.header.Get("X-Request-Id")
 	if parsed {
-		if errObj, ok := data["error"].(map[string]any); ok {
-			code, _ := errObj["code"].(string)
+		if obj, ok := data["error"].(map[string]any); ok {
+			code, _ := obj["code"].(string)
 			if code == "" {
 				code = "request_error"
 			}
-			msg, _ := errObj["message"].(string)
-			rid, _ := data["request_id"].(string)
-			if rid == "" {
-				rid = header.Get("X-Request-Id")
+			msg, _ := obj["message"].(string)
+			if r, _ := data["request_id"].(string); r != "" {
+				rid = r
 			}
-			return nil, newError(status, code, msg, rid, retryAfter, data)
+			return newError(resp.status, code, msg, rid, retryAfter, data)
+		}
+		if detail, ok := data["detail"].(string); ok { // framework errors (405 on a trailing slash)
+			return newError(resp.status, "http_error", detail, rid, retryAfter, data)
 		}
 	}
-	snippet := strings.TrimSpace(strings.ToValidUTF8(string(raw[:min(len(raw), 200)]), "�"))
+	snippet := strings.TrimSpace(strings.ToValidUTF8(string(resp.raw[:min(len(resp.raw), 200)]), "�"))
 	if snippet == "" {
-		snippet = fmt.Sprintf("HTTP %d", status)
+		snippet = fmt.Sprintf("HTTP %d", resp.status)
 	}
-	return nil, newError(status, "http_error", snippet, header.Get("X-Request-Id"), retryAfter, nil)
+	return newError(resp.status, "http_error", snippet, rid, retryAfter, nil)
 }
