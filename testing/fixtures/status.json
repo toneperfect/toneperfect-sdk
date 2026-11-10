@@ -1,0 +1,220 @@
+{
+ "status": "operational",
+ "reason": null,
+ "reason_code": null,
+ "generated_at": "2026-11-10T09:58:01+00:00",
+ "probe": {
+  "enabled": true,
+  "interval_seconds": 300,
+  "what": "One synthetic clip per language (de-DE, en-US, es-419, fr-FR, it-IT, ja-JP, ko-KR, pt-BR, ru-RU, zh-CN), machine speech with no real voice, scored through the same engine path as /v1/assess on the box that serves it; no account or credits involved. The backup engine, which scores recordings up to 30 s while the main engine is unavailable, gets a readiness check.",
+  "pass_means": "A well-formed scored result came back. It does not measure scoring accuracy. Checks that find the engine busy with customer work are skipped, not failed."
+ },
+ "last_check": {
+  "checked_at": "2026-11-10T09:53:01+00:00",
+  "ok": true,
+  "http_status": 200,
+  "latency_ms": 445,
+  "model_version": "mandarin-human-v2-85741cdf3967-fbf73d85ee88",
+  "error": null
+ },
+ "consecutive_failures": 0,
+ "consecutive_busy": 0,
+ "last_1h": {
+  "checks": 103,
+  "ok": 103,
+  "success_rate": 1.0,
+  "p50_latency_ms": 466,
+  "p90_latency_ms": 811
+ },
+ "last_24h": {
+  "checks": 2286,
+  "ok": 2286,
+  "success_rate": 1.0,
+  "p50_latency_ms": 465,
+  "p90_latency_ms": 808,
+  "busy_skipped": 554
+ },
+ "last_7d": {
+  "checks": 15840,
+  "ok": 15840,
+  "success_rate": 1.0,
+  "p50_latency_ms": 598,
+  "p90_latency_ms": 1041
+ },
+ "engines": [
+  {
+   "name": "eu:de-DE",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:52:57+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 510,
+    "model_version": "multilingual-native-v1-de-27e97a535a55",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "eu:en-US",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:52:57+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 487,
+    "model_version": "multilingual-native-v1-en-6605a72ce19a",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "eu:es-419",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:52:58+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 559,
+    "model_version": "multilingual-native-v1-es-7af340d48b3a",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "eu:fr-FR",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:52:58+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 484,
+    "model_version": "multilingual-native-v1-fr-201c5da17ec4",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "eu:it-IT",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:52:59+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 369,
+    "model_version": "multilingual-native-v1-it-516873052648",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "eu:pt-BR",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:52:59+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 337,
+    "model_version": "multilingual-native-v1-pt-22ab61be4ba5",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "eu:ru-RU",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:52:59+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 289,
+    "model_version": "multilingual-native-v1-ru-dd47176068cc",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "jkz:ja-JP",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:53:00+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 439,
+    "model_version": "multilingual-native-v1-ja-083654623de8",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "jkz:ko-KR",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:53:01+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 846,
+    "model_version": "multilingual-native-v1-ko-60484e2476f5",
+    "error": null
+   },
+   "consecutive_failures": 0
+  },
+  {
+   "name": "jkz:zh-CN",
+   "status": "operational",
+   "reason_code": null,
+   "last_check": {
+    "checked_at": "2026-11-10T09:53:01+00:00",
+    "ok": true,
+    "http_status": 200,
+    "latency_ms": 445,
+    "model_version": "mandarin-human-v2-85741cdf3967-fbf73d85ee88",
+    "error": null
+   },
+   "consecutive_failures": 0
+  }
+ ],
+ "backup_engine": {
+  "status": "operational",
+  "last_check": {
+   "checked_at": "2026-11-10T09:53:01+00:00",
+   "ok": true,
+   "http_status": 200,
+   "latency_ms": 12,
+   "model_version": "readiness_check",
+   "error": null
+  },
+  "consecutive_failures": 0,
+  "serves": "Recordings up to 30 s while the main engine is unavailable."
+ },
+ "serving": {
+  "main_engine": {
+   "eu": "up",
+   "jkz": "up"
+  },
+  "backup_engine": "operational",
+  "last_15m": {
+   "fallback_share": null,
+   "failed_share": null
+  },
+  "last_24h": {
+   "fallback_share": 0.0,
+   "failed_share": 0.0
+  },
+  "fallback_means": "Scored by the backup engine (recordings up to 30 s; its model_version ends in +fallback). Longer recordings get 503 engine_unavailable and are not charged."
+ },
+ "gateway": {
+  "database": "ok",
+  "server_error_share_15m": null,
+  "counting_since": "2026-11-07T20:16:50+00:00"
+ }
+}

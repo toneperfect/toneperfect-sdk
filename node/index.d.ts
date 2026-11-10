@@ -1,169 +1,173 @@
-/// <reference types="node" />
+// Types for toneperfect 0.3.0 (CommonJS and ESM entries share them).
+
 export declare const VERSION: string;
 export declare const DEFAULT_BASE_URL: string;
-export declare const TASKS: readonly ['general', 'connected_speech', 'isolated_word'];
-export type Task = (typeof TASKS)[number];
-/** review / uncertain / no_correction are the feedback decisions; unassessable, partial and
- *  legacy_correction also occur. Unknown values should be treated as "no decision". */
-export type Decision = 'review' | 'uncertain' | 'no_correction' | 'unassessable' | 'partial' | 'legacy_correction' | (string & {});
-export declare const DECISIONS: readonly ['review', 'uncertain', 'no_correction', 'unassessable', 'partial', 'legacy_correction'];
-/** Error codes after which the SAME Idempotency-Key must be retried. */
+export declare const BILLING_URL: string;
+export declare const TASKS: readonly Task[];
+export declare const TEST_OUTCOMES: readonly TestOutcome[];
+export declare const DECISIONS: readonly string[];
 export declare const RETRY_SAME_KEY_CODES: ReadonlySet<string>;
+export declare const NEW_KEY_CODES: ReadonlySet<string>;
 
-/** One sound (phoneme, or Mandarin initial/final/tone) under a word. Extra evidence fields may be present. */
-export interface Phone {
-  dimension?: 'initial' | 'final' | 'tone' | string;
-  expected: string | number | null;
-  heard: string | number | null;
-  score: number | null;
-  decision?: Decision;
-  [key: string]: unknown;
-}
+export type Locale = 'zh-CN' | 'en-US' | 'fr-FR' | 'es-419' | 'de-DE' | 'it-IT' | 'pt-BR' | 'ru-RU' | 'ko-KR' | 'ja-JP';
+export type Task = 'general' | 'connected_speech' | 'isolated_word';
+export type TestOutcome = 'success' | 'unassessable' | 'invalid_assessment' | 'engine_unavailable' | 'subscription_required'
+  | 'subscription_past_due' | 'insufficient_credits' | 'account_busy' | 'rate_limit';
+/** review / uncertain / no_correction, plus unassessable, partial, legacy_correction; treat others as "no decision". */
+export type Decision = 'review' | 'uncertain' | 'no_correction' | 'unassessable' | 'partial' | 'legacy_correction' | (string & {});
+/** A file path, URL, Buffer (a Uint8Array), Uint8Array, ArrayBuffer or Blob. */
+export type AudioInput = string | URL | Uint8Array | ArrayBuffer | Blob;
 
-/** One word or Mandarin character. */
-export interface Word {
-  word: string;
-  score: number | null;
-  start_ms?: number;
-  end_ms?: number;
-  pinyin?: string;
-  decision?: Decision;
-  phones?: Phone[];
-  [key: string]: unknown;
-}
-
-export interface Billing { credits: number; balance_credits: number }
-
-/** Full JSON body of POST /v1/assess. Fields beyond these are returned as-is. */
-export interface AssessmentData {
-  assessable: boolean;
-  reason?: string;
-  scores: Record<string, number | null> & { overall?: number | null };
-  words?: Word[];
-  syllables?: unknown[];
-  billing: Billing;
-  model_version?: string;
-  id?: string;
-  [key: string]: unknown;
-}
-
-export interface CapabilityLanguage {
-  locale: string;
-  available?: boolean;
-  status?: string;
-  dimensions?: string[];
-  correction_level?: string;
-  limitations?: unknown;
-  [key: string]: unknown;
-}
-
-export interface Capabilities {
-  model_version?: string;
-  languages: CapabilityLanguage[];
-  limits?: { max_audio_seconds: number; max_upload_bytes: number; concurrent_requests_per_account: number };
-  score_scale?: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
-export declare class TonePerfectError extends Error {
-  /** HTTP status, or 0 for a transport failure (code `timeout` / `network_error`). */
-  status: number;
-  /** API error code: invalid_api_key, subscription_required, insufficient_credits, invalid_audio, rate_limit, ... */
-  code: string;
-  detail: string;
-  requestId: string | null;
-  retryAfter: number | null;
-  /** The error body as returned by the API. */
-  body: Record<string, unknown>;
-  /** `req_…` result id when the failure was finalized under your Idempotency-Key. */
-  id: string | null;
-  billing: Billing | null;
-  /** The failure is a stored result for this key (id + billing present); the same key replays it for 24 h. */
-  readonly finalized: boolean;
-  /** Start a new attempt with a new Idempotency-Key. */
-  readonly needsNewKey: boolean;
-  /** Nothing was finalized: retry later with the SAME Idempotency-Key. */
-  readonly retryable: boolean;
-  constructor(status: number, code: string, message: string, requestId?: string | null, retryAfter?: number | null, body?: Record<string, unknown> | null);
-}
-/** 401: missing, revoked or unknown API key. */
-export declare class AuthenticationError extends TonePerfectError {}
-/** 402: nothing charged. code: subscription_required | insufficient_credits | payment_balance_due. */
-export declare class PaymentRequiredError extends TonePerfectError {}
-/** 429: rate_limit or account_busy. Retry with the same Idempotency-Key. */
-export declare class RateLimitError extends TonePerfectError {}
-/** Other 4xx: fix the request. */
-export declare class ValidationError extends TonePerfectError {}
-/** 5xx. */
-export declare class ServerError extends TonePerfectError {}
-/** Transport failure (status 0): timeout or network_error. */
-export declare class APIConnectionError extends TonePerfectError {}
-
-export declare class Assessment {
-  data: AssessmentData;
-  status: number;
-  headers: Headers;
-  requestId: string | null;
-  /** True when the result was replayed from a previous identical request (not charged again). */
-  replayed: boolean;
-  constructor(data: AssessmentData, status: number, headers: Headers);
-  readonly assessable: boolean;
-  readonly reason: string | null;
-  readonly scores: AssessmentData['scores'];
-  readonly overall: number | null;
-  readonly words: Word[];
-  readonly billing: Billing | Record<string, never>;
-  readonly modelVersion: string | null;
-  readonly id: string | null;
-}
-
-export type AudioInput = string | URL | Buffer | Uint8Array | ArrayBuffer | Blob;
-
-export interface AssessFields {
-  /** Reference text the learner read. Required unless `pinyin` is given (Mandarin). */
-  text?: string;
-  /** Locale such as zh-CN, en-US, fr-FR. Default zh-CN. See capabilities(). */
-  language?: string;
-  /** Explicit Mandarin reading with numbered tones, e.g. "ni3 hao3". */
-  pinyin?: string;
-  /** general (default), connected_speech or isolated_word. */
-  task?: Task;
-  /** Unique per attempt; generated when omitted. Reuse for retries of an unknown outcome. */
-  idempotencyKey?: string;
-  filename?: string;
-  contentType?: string;
-}
-
-export interface TonePerfectOptions {
+export interface ClientOptions {
+  /** tp_live_… or a tp_test_… test key. Default: process.env.TONEPERFECT_API_KEY. */
   apiKey?: string;
+  /** Default: process.env.TONEPERFECT_BASE_URL, else https://api.toneperfect.app. */
   baseUrl?: string;
+  /** Per-request timeout in milliseconds (default 60 000). */
   timeoutMs?: number;
+  /** Automatic retries of a retryable failure, with the same Idempotency-Key (default 2). */
+  maxRetries?: number;
+  /** Extra headers for every request, e.g. { 'TonePerfect-Fallback': 'off' }. */
+  headers?: Record<string, string>;
   fetch?: typeof fetch;
   userAgent?: string;
 }
 
-export declare class TonePerfect {
-  apiKey: string;
-  baseUrl: string;
-  timeoutMs: number;
-  constructor(options?: TonePerfectOptions);
-  /** GET /v1/capabilities (no key needed). */
-  capabilities(): Promise<Capabilities>;
-  /** POST /v1/assess. Throws TonePerfectError for every non-2xx status. */
-  assess(audio: AudioInput, fields?: AssessFields): Promise<Assessment>;
+export interface AssessFields {
+  /** Required locale. */
+  language: Locale | (string & {});
+  /** What the learner was asked to say. Mandarin may send toned pinyin instead. */
+  text?: string;
+  /** Mandarin: picks the reading of a polyphone next to characters, or toned pinyin alone. */
+  pinyin?: string;
+  task?: Task;
+  /** One per recording attempt; made for you and reused by the automatic retries. */
+  idempotencyKey?: string;
+  filename?: string;
+  contentType?: string;
+  /** Ask for the stable compact schema (toneperfect.compact.v1). */
+  compact?: boolean;
+  /** tp_test_ keys only. */
+  testOutcome?: TestOutcome;
 }
 
-export declare function newIdempotencyKey(prefix?: string): string;
+/** 0–100 display grades; null = not measured by this pack. */
+export interface Scores {
+  overall: number | null;
+  pronunciation?: number | null;
+  initial?: number | null;
+  final?: number | null;
+  tone?: number | null;
+  integrity?: number | null;
+  completeness?: number | null;
+  fluency?: number | null;
+  rhythm?: number | null;
+  [dimension: string]: number | null | undefined;
+}
+
+export interface Billing {
+  credits: number;
+  balanceCredits: number | null;
+  freeCredits: number | null;
+  /** free, plan or test. */
+  source: 'free' | 'plan' | 'test' | null;
+  /** The raw snake_case fields are kept too. */
+  [field: string]: unknown;
+}
+
+export declare class Phone {
+  /** phoneme, or initial / final / tone in Mandarin. */
+  readonly dimension: string | null;
+  readonly expected: string | number | null;
+  readonly heard: string | number | null;
+  readonly score: number | null;
+  readonly decision: Decision | null;
+  readonly data: Record<string, unknown>;
+}
+
+export declare class Word {
+  readonly word: string | null;
+  readonly score: number | null;
+  readonly startMs: number | null;
+  readonly endMs: number | null;
+  readonly decision: Decision | null;
+  readonly pinyin: string | null;
+  readonly phones: Phone[];
+  readonly data: Record<string, unknown>;
+}
+
+export declare class Assessment {
+  /** The JSON body exactly as returned (full or compact schema). */
+  readonly data: Record<string, any>;
+  readonly status: number;
+  readonly headers: Headers;
+  readonly requestId: string | null;
+  readonly replayed: boolean;
+  readonly idempotencyKey: string;
+  readonly id: string | null;
+  /** false when the recording could not be scored: see reason. Free, never a score of zero. */
+  readonly assessable: boolean;
+  readonly reason: string | null;
+  readonly scores: Scores;
+  readonly overall: number | null;
+  readonly words: Word[];
+  readonly warnings: string[];
+  readonly billing: Billing;
+  readonly modelVersion: string | null;
+  /** primary or fallback. */
+  readonly engine: string | null;
+  /** true for a fixed example response from a tp_test_ key. */
+  readonly test: boolean;
+  readonly compact: boolean;
+}
+
+export declare class TonePerfectError extends Error {
+  readonly status: number;
+  readonly code: string;
+  /** The API's message, written for people. */
+  readonly detail: string;
+  readonly requestId: string | null;
+  readonly retryAfter: number | null;
+  readonly body: Record<string, any>;
+  readonly idempotencyKey: string | null;
+  readonly id: string | null;
+  readonly billing: Record<string, unknown> | null;
+  /** 402: where to start, renew or fix a plan. */
+  readonly billingUrl: string | null;
+  readonly pricingUrl: string | null;
+  readonly plan: { id?: string; name?: string; monthly_credits?: number; price_usd?: number; interval?: string } | null;
+  readonly finalized: boolean;
+  readonly needsNewKey: boolean;
+  readonly retryable: boolean;
+}
+export declare class AuthenticationError extends TonePerfectError {}
+export declare class PaymentRequiredError extends TonePerfectError {}
+export declare class RateLimitError extends TonePerfectError {}
+export declare class ValidationError extends TonePerfectError {}
+export declare class ServerError extends TonePerfectError {}
+export declare class APIConnectionError extends TonePerfectError {}
+
+export interface LintIssue { code: string; message: string; field?: 'text' | 'pinyin'; severity: 'error' | 'warning'; }
+export interface LintResult { ok: boolean; language: string; issues: LintIssue[]; units: number; }
+
+export declare class TonePerfect {
+  constructor(options?: ClientOptions);
+  readonly apiKey: string;
+  readonly baseUrl: string;
+  readonly timeoutMs: number;
+  readonly maxRetries: number;
+  capabilities(): Promise<Record<string, any>>;
+  lint(text: string, options: { language: Locale | (string & {}); pinyin?: string; task?: Task }): Promise<LintResult>;
+  status(): Promise<Record<string, any>>;
+  assess(audio: AudioInput, fields: AssessFields): Promise<Assessment>;
+}
+
+export declare function newIdempotencyKey(): string;
 
 declare const _default: {
-  TonePerfect: typeof TonePerfect;
-  TonePerfectError: typeof TonePerfectError;
-  Assessment: typeof Assessment;
-  newIdempotencyKey: typeof newIdempotencyKey;
-  DEFAULT_BASE_URL: string;
-  TASKS: typeof TASKS;
-  DECISIONS: typeof DECISIONS;
-  RETRY_SAME_KEY_CODES: typeof RETRY_SAME_KEY_CODES;
-  VERSION: string;
+  TonePerfect: typeof TonePerfect; Assessment: typeof Assessment; Word: typeof Word; Phone: typeof Phone;
+  TonePerfectError: typeof TonePerfectError; AuthenticationError: typeof AuthenticationError; PaymentRequiredError: typeof PaymentRequiredError;
+  RateLimitError: typeof RateLimitError; ValidationError: typeof ValidationError; ServerError: typeof ServerError; APIConnectionError: typeof APIConnectionError;
+  newIdempotencyKey: typeof newIdempotencyKey; DEFAULT_BASE_URL: string; BILLING_URL: string; VERSION: string;
 };
 export default _default;

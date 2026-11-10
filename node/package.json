@@ -1,25 +1,22 @@
 {
   "name": "toneperfect",
-  "version": "0.1.0",
-  "description": "Client for the TonePerfect pronunciation assessment API, 10 languages: sentence, word and sound scores for a recording of a known text.",
+  "version": "0.3.0",
+  "description": "Client for the TonePerfect pronunciation assessment API, 10 languages: sentence, word and sound scores, Mandarin initial/final/tone per syllable.",
   "license": "MIT",
   "author": "TonePerfect <nik@toneperfect.app>",
   "homepage": "https://api.toneperfect.app",
   "bugs": {
-    "email": "nik@toneperfect.app",
-    "url": "https://api.toneperfect.app/docs"
+    "email": "nik@toneperfect.app"
   },
   "keywords": [
     "pronunciation",
+    "pronunciation-assessment",
     "speech",
-    "assessment",
+    "speech-assessment",
     "mandarin",
     "tones",
     "language-learning",
     "api",
-    "pronunciation-assessment",
-    "speech-assessment",
-    "api-client",
     "sdk"
   ],
   "main": "./index.cjs",
@@ -27,16 +24,28 @@
   "types": "./index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.mjs",
-      "require": "./index.cjs"
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./index.mjs"
+      },
+      "require": {
+        "types": "./index.d.ts",
+        "default": "./index.cjs"
+      }
     },
-    "./package.json": "./package.json"
+    "./rubric": {
+      "types": "./rubric.d.ts",
+      "default": "./rubric.cjs"
+    }
   },
   "files": [
     "index.cjs",
     "index.mjs",
     "index.d.ts",
+    "index.d.mts",
+    "rubric.cjs",
+    "rubric.d.ts",
+    "bin",
     "README.md",
     "LICENSE",
     "examples"
@@ -48,5 +57,13 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {},
+  "bin": {
+    "toneperfect-lint": "./bin/toneperfect-lint.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vm542/toneperfect-sdk.git",
+    "directory": "node"
+  }
 }

@@ -1,0 +1,310 @@
+{
+ "model_version": "oob-serving-rc8",
+ "engine_release": "rc8",
+ "languages": [
+  {
+   "language": "en",
+   "locale": "en-US",
+   "name": "English",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-en-6605a72ce19a",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "Experimental native-reference scores; rhotic ɝ is outside this pack's phonetic coverage."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "fr",
+   "locale": "fr-FR",
+   "name": "French",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-fr-201c5da17ec4",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "Experimental legacy native-reference scores; some G2P consonants/glides remain unassessed."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "es",
+   "locale": "es-419",
+   "name": "Spanish",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-es-7af340d48b3a",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "Small native-reference calibration; learner score bands and correction accuracy remain unvalidated."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "de",
+   "locale": "de-DE",
+   "name": "German",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-de-27e97a535a55",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "Small native-reference calibration; ʏ is outside the acoustic inventory."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "it",
+   "locale": "it-IT",
+   "name": "Italian",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-it-516873052648",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "Small native-reference calibration; one native control scored 49.8, so the lower score band needs improvement."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "pt",
+   "locale": "pt-BR",
+   "name": "Portuguese",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-pt-22ab61be4ba5",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "Small native-reference calibration; native controls had median 69.2 and nasalized glides are partly unassessed. Learner score bands need improvement."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "ru",
+   "locale": "ru-RU",
+   "name": "Russian",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-ru-dd47176068cc",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "New pack (beta): calibrated on graded learner recordings; stress and vowel reduction are scored through the transcription."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "ko",
+   "locale": "ko-KR",
+   "name": "Korean",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-ko-60484e2476f5",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "New pack (beta): native-reference scale, not yet calibrated on graded learner recordings; about 1 in 10 native read sentences scores below 60, and a different sentence still scores around 20. Aspirated s/tɕ and tense consonants are scored as their plain counterparts."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "ja",
+   "locale": "ja-JP",
+   "name": "Japanese",
+   "available": true,
+   "status": "experimental",
+   "model_version": "multilingual-native-v1-ja-083654623de8",
+   "tasks": [
+    "scripted_speech"
+   ],
+   "correction_level": "word",
+   "dimensions": [
+    "pronunciation",
+    "completeness"
+   ],
+   "phoneme_detail": "experimental evidence; not validated corrections",
+   "limitations": [
+    "New pack (beta): native-reference scale, not yet calibrated on graded learner recordings; a different sentence can still score around 30, and kanji are read with a dictionary that can miss context-dependent readings (今日は). Text is split into bunsetsu-like units; pitch accent is not scored."
+   ],
+   "unsupported_dimensions": [
+    "lexical_stress",
+    "tone",
+    "intonation"
+   ],
+   "max_words": 320,
+   "max_duration_seconds": 120
+  },
+  {
+   "language": "zh",
+   "locale": "zh-CN",
+   "name": "Mandarin Chinese",
+   "available": true,
+   "status": "experimental",
+   "dimensions": [
+    "pronunciation",
+    "initial",
+    "final",
+    "tone"
+   ],
+   "tasks": [
+    "general",
+    "connected_speech",
+    "isolated_word"
+   ],
+   "correction_level": "syllable",
+   "max_duration_seconds": 120,
+   "notes": "Send Hanzi in text, numbered pinyin in pinyin (or both: pinyin picks the reading of characters with several), or numbered pinyin alone (up to 100 syllables and 30 s)."
+  }
+ ],
+ "score_scale": {
+  "range": [
+   0,
+   100
+  ],
+  "type": "pronunciation_quality",
+  "calibration": "reference_range_display",
+  "note": "Display grades and correction decisions are separate. Unassessable or unsupported dimensions return null."
+ },
+ "engines": [
+  {
+   "name": "eu",
+   "status": "up",
+   "model_version": "oob-serving-rc8"
+  },
+  {
+   "name": "jkz",
+   "status": "up",
+   "model_version": "oob-serving-rc8"
+  }
+ ],
+ "limits": {
+  "max_audio_seconds": 120,
+  "max_upload_bytes": 10485760,
+  "concurrent_requests_per_account": 2,
+  "concurrent_requests_by_plan": {
+   "free": 2,
+   "starter": 2,
+   "builder": 2,
+   "scale": 2
+  },
+  "requests_per_minute_per_account": 60,
+  "engine_timeout_seconds": 90,
+  "engine_timeout_seconds_over_30s_audio": 180,
+  "seconds_per_credit": 15
+ },
+ "response_formats": [
+  "full",
+  "compact"
+ ]
+}

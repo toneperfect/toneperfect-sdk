@@ -1,0 +1,74 @@
+{
+  "engine_unavailable": {
+    "status": 503,
+    "body": {
+      "error": {
+        "code": "engine_unavailable",
+        "message": "The engine could not finish this assessment. No credits were charged."
+      },
+      "id": "test_b36783b3fde36d40c19e",
+      "billing": {
+        "credits": 0,
+        "balance_credits": 2500,
+        "free_credits": 50,
+        "source": "test"
+      }
+    }
+  },
+  "invalid_assessment": {
+    "status": 422,
+    "body": {
+      "error": {
+        "code": "invalid_assessment",
+        "message": "The engine could not assess this reference: example refusal from a test key."
+      },
+      "id": "test_664de398ea507a37e952",
+      "billing": {
+        "credits": 0,
+        "balance_credits": 2500,
+        "free_credits": 50,
+        "source": "test"
+      }
+    }
+  },
+  "insufficient_credits": {
+    "status": 402,
+    "body": {
+      "error": {
+        "code": "insufficient_credits",
+        "message": "Purchase a credit pack before sending an assessment."
+      },
+      "request_id": "req_4fd5a788fb2641c4907640fdf278ed05"
+    }
+  },
+  "subscription_required": {
+    "status": 402,
+    "body": {
+      "error": {
+        "code": "subscription_required",
+        "message": "Your free credits are used up. Start or renew a monthly plan to keep assessing; any plan credits you have remain in your account."
+      },
+      "request_id": "req_6061027103a649258dd34137b0bff10d"
+    }
+  },
+  "account_busy": {
+    "status": 429,
+    "body": {
+      "error": {
+        "code": "account_busy",
+        "message": "2 assessment(s) are already running for this account. Retry shortly with the same Idempotency-Key."
+      },
+      "request_id": "req_65243fdd8fc34880918f6308186505f0"
+    }
+  },
+  "rate_limit": {
+    "status": 429,
+    "body": {
+      "error": {
+        "code": "rate_limit",
+        "message": "Maximum 60 assessment requests per minute per account."
+      },
+      "request_id": "req_e7bd378a220e4860827eaf257c2923c2"
+    }
+  }
+}

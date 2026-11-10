@@ -1,0 +1,59 @@
+{
+  "schema": "toneperfect.compact.v1",
+  "id": "req_fixture000000000001",
+  "assessable": true,
+  "reason": null,
+  "locale": "zh-CN",
+  "task": "general",
+  "model_version": "mandarin-human-v2-fixture",
+  "scores": {
+    "overall": 81.2,
+    "pronunciation": 77.0,
+    "initial": 80.0,
+    "final": 74.0,
+    "tone": 66.5,
+    "fluency": null,
+    "rhythm": null,
+    "completeness": null
+  },
+  "words": [
+    {
+      "text": "你",
+      "pinyin": "ni3",
+      "score": 70.0,
+      "start_ms": 120,
+      "end_ms": 380,
+      "decision": null,
+      "units": [
+        {
+          "dimension": "initial",
+          "expected": "n",
+          "heard": "n",
+          "score": 90.0,
+          "decision": "no_correction"
+        },
+        {
+          "dimension": "final",
+          "expected": "i",
+          "heard": "i",
+          "score": 88.0,
+          "decision": "no_correction"
+        },
+        {
+          "dimension": "tone",
+          "expected": "3",
+          "heard": "2",
+          "score": 41.0,
+          "decision": "review"
+        }
+      ]
+    }
+  ],
+  "warnings": [],
+  "billing": {
+    "credits": 1,
+    "balance_credits": 2499,
+    "free_credits": 0,
+    "source": "plan"
+  }
+}
